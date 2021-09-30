@@ -5,7 +5,7 @@
 @typescript-eslint/no-explicit-any: "off",
  */
 
-import { Notetypes } from "lib/proto";
+import { Notetypes } from "../lib/proto";
 import { ChangeNotetypeState, negativeOneToNull, MapContext } from "./lib";
 import { get } from "svelte/store";
 

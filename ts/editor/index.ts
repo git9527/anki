@@ -37,10 +37,10 @@ export function setFormat(cmd: string, arg?: string, _nosave = false): void {
 import "sveltelib/export-runtime";
 import "lib/register-package";
 
-import { setupI18n, ModuleName } from "lib/i18n";
-import { isApplePlatform } from "lib/platform";
-import { registerShortcut } from "lib/shortcuts";
-import { bridgeCommand } from "lib/bridgecommand";
+import { setupI18n, ModuleName } from "../lib/i18n";
+import { isApplePlatform } from "../lib/platform";
+import { registerShortcut } from "../lib/shortcuts";
+import { bridgeCommand } from "../lib/bridgecommand";
 
 declare global {
     interface Selection {
@@ -65,7 +65,7 @@ export const i18n = setupI18n({
 });
 
 import OldEditorAdapter from "./OldEditorAdapter.svelte";
-import { nightModeKey } from "components/context-keys";
+import { nightModeKey } from "../components/context-keys";
 
 import "./editor-base.css";
 import "./bootstrap.css";
