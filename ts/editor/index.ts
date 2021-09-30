@@ -11,7 +11,7 @@ export const $editorToolbar = new Promise(() => {
     /* noop */
 });
 
-import { filterHTML } from "html-filter";
+import { filterHTML } from "../html-filter";
 
 export function pasteHTML(
     html: string,
@@ -34,8 +34,8 @@ export function setFormat(cmd: string, arg?: string, _nosave = false): void {
     // }
 }
 
-import "sveltelib/export-runtime";
-import "lib/register-package";
+import "../sveltelib/export-runtime";
+import "../lib/register-package";
 
 import { setupI18n, ModuleName } from "../lib/i18n";
 import { isApplePlatform } from "../lib/platform";

@@ -2,10 +2,10 @@
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 // languageServerHost taken from MIT sources - see below.
 
-const fs = require("fs");
-const worker = require("@bazel/worker");
-const svelte2tsx = require("svelte2tsx");
-const preprocess = require("svelte-preprocess");
+import * as fs from "fs";
+import * as worker from "@bazel/worker";
+import { svelte2tsx } from "svelte2tsx";
+import preprocess from "svelte-preprocess";
 import { basename } from "path";
 import * as ts from "typescript";
 import * as svelte from "svelte/compiler.js";
@@ -90,8 +90,8 @@ const languageServiceHost: ts.LanguageServiceHost = {
 
 const languageService = ts.createLanguageService(languageServiceHost);
 
-function compile(tsPath: string, tsLibs: string[]) {
-    parsedCommandLine.fileNames = [tsPath, ...tsLibs];
+function compile(tsPath: string) {
+    parsedCommandLine.fileNames = [tsPath];
     const program = languageService.getProgram()!;
     const tsHost = ts.createCompilerHost(parsedCommandLine.options);
     const createdFiles = {};
@@ -124,21 +124,18 @@ function readFile(file) {
     });
 }
 
-async function writeDts(tsPath, dtsPath, tsLibs) {
-    const dtsSource = compile(tsPath, tsLibs);
+async function writeDts(tsPath, dtsPath) {
+    const dtsSource = compile(tsPath);
     await writeFile(dtsPath, dtsSource);
 }
 
 function writeTs(svelteSource, sveltePath, tsPath): void {
     let tsSource = svelte2tsx(svelteSource, {
         filename: sveltePath,
-        strictMode: true,
         isTsFile: true,
+        mode: "dts",
     });
     let codeLines = tsSource.code.split("\n");
-    // replace the "///<reference types="svelte" />" with a line
-    // turning off checking, as we'll use svelte-check for that
-    codeLines[0] = "// @ts-nocheck";
     updateFileContent(tsPath, codeLines.join("\n"));
 }
 
@@ -164,10 +161,11 @@ async function writeJs(
             ],
         },
     });
-    preprocessOptions.filename = inputFilename;
 
     try {
-        const processed = await svelte.preprocess(source, preprocessOptions);
+        const processed = await svelte.preprocess(source, preprocessOptions, {
+            filename: inputFilename,
+        });
         const result = svelte.compile(processed.toString!(), {
             format: "esm",
             css: false,
@@ -194,12 +192,12 @@ async function writeJs(
 }
 
 async function compileSvelte(args) {
-    const [sveltePath, mjsPath, dtsPath, cssPath, binDir, genDir, ...tsLibs] = args;
+    const [sveltePath, mjsPath, dtsPath, cssPath, binDir, genDir] = args;
     const svelteSource = (await readFile(sveltePath)) as string;
 
     const mockTsPath = sveltePath + ".tsx";
     writeTs(svelteSource, sveltePath, mockTsPath);
-    await writeDts(mockTsPath, dtsPath, tsLibs);
+    await writeDts(mockTsPath, dtsPath);
     await writeJs(svelteSource, sveltePath, mjsPath, cssPath, binDir, genDir);
 
     return true;

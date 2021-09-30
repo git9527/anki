@@ -20,6 +20,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     } from "./tags";
     import { Tags } from "../lib/proto";
     import { postRequest } from "../lib/postrequest";
+    import { execCommand } from "./helpers";
 
     export let size: number;
     export let wrap: boolean;
@@ -359,7 +360,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         textarea.style.left = "-9999px";
         document.body.appendChild(textarea);
         textarea.select();
-        document.execCommand("copy");
+        execCommand("copy");
         document.body.removeChild(textarea);
     }
 
