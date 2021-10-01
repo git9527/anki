@@ -1,0 +1,1 @@
+../../bazel-bin/ts/editor/MultiRootEditor.svelte.d.ts

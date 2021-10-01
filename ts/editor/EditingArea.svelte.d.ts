@@ -1,0 +1,1 @@
+../../bazel-bin/ts/editor/EditingArea.svelte.d.ts

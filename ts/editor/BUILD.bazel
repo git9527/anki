@@ -38,8 +38,8 @@ compile_svelte()
 typescript(
     name = "editor_ts",
     srcs = glob(
-        ["*.ts"],
-        exclude = ["*.svelte.d.ts"],
+        ["**/*.ts"],
+        exclude = ["**/*.svelte.d.ts"],
     ),
     deps = [
         ":svelte",

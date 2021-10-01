@@ -1,0 +1,1 @@
+../../bazel-bin/ts/editor/LabelName.svelte.d.ts

@@ -1,0 +1,1 @@
+../../bazel-bin/ts/editor/FieldState.svelte.d.ts

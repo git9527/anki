@@ -1,0 +1,1 @@
+../../../bazel-bin/ts/editor/image-overlay/FloatButtons.svelte.d.ts

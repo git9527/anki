@@ -1,0 +1,1 @@
+../../../bazel-bin/ts/editor/image-overlay/WithImageConstrained.svelte.d.ts

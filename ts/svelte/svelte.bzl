@@ -58,7 +58,7 @@ svelte = rule(
 
 def compile_svelte(name = "svelte", srcs = None, visibility = ["//visibility:private"]):
     if not srcs:
-        srcs = native.glob(["*.svelte"])
+        srcs = native.glob(["**/*.svelte"])
     for src in srcs:
         svelte(
             name = src.replace(".svelte", ""),
