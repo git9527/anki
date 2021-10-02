@@ -33,13 +33,11 @@ export interface DecoratedElementConstructor extends CustomElementConstructor {
     toUndecorated(stored: string): string;
 }
 
-class DefineArray extends Array {
-    push(...elements: DecoratedElementConstructor[]) {
+export class DefineArray extends Array {
+    push(...elements: DecoratedElementConstructor[]): number {
         for (const element of elements) {
             customElements.define(element.tagName, element);
         }
         return super.push(...elements);
     }
 }
-
-export const decoratedComponents: DecoratedElementConstructor[] = new DefineArray();

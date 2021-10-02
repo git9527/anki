@@ -1,0 +1,1 @@
+../../bazel-bin/ts/editor/NoteEditor.svelte.d.ts

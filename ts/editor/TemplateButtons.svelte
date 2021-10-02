@@ -5,7 +5,11 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 <script lang="typescript">
     import * as tr from "../lib/i18n";
     import { bridgeCommand } from "../lib/bridgecommand";
-    import { fieldFocusedKey, inCodableKey } from "./context-keys";
+    import {
+        fieldFocusedKey,
+        currentFieldKey,
+        focusInCodableKey,
+    } from "../lib/context-keys";
 
     import ButtonGroup from "../components/ButtonGroup.svelte";
     import ButtonGroupItem from "../components/ButtonGroupItem.svelte";
@@ -18,7 +22,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     import OnlyEditable from "./OnlyEditable.svelte";
     import ClozeButton from "./ClozeButton.svelte";
 
-    import { getCurrentField, appendInParentheses } from "./helpers";
+    import type { Writable } from "svelte/store";
+    import { getContext } from "svelte";
+    import type { EditorFieldAPI } from "./MultiRootEditor.svelte";
+    import { appendInParentheses } from "./helpers";
     import { withButton } from "../components/helpers";
     import { wrapCurrent } from "./wrap";
     import { paperclipIcon, micIcon, functionIcon, xmlIcon } from "./icons";
@@ -33,17 +40,16 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         bridgeCommand("record");
     }
 
+    const currentField = getContext<Writable<EditorFieldAPI | null>>(currentFieldKey);
+
     function onHtmlEdit() {
-        const currentField = getCurrentField();
-        if (currentField) {
-            currentField.toggleHtmlEdit();
-        }
+        $currentField?.editingArea!.toggleCodable();
     }
 </script>
 
 <ButtonGroup {api}>
     <ButtonGroupItem>
-        <WithShortcut shortcut={"F3"} let:createShortcut let:shortcutLabel>
+        <WithShortcut shortcut="F3" let:createShortcut let:shortcutLabel>
             <OnlyEditable let:disabled>
                 <IconButton
                     tooltip={appendInParentheses(
@@ -62,7 +68,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     </ButtonGroupItem>
 
     <ButtonGroupItem>
-        <WithShortcut shortcut={"F5"} let:createShortcut let:shortcutLabel>
+        <WithShortcut shortcut="F5" let:createShortcut let:shortcutLabel>
             <OnlyEditable let:disabled>
                 <IconButton
                     tooltip={appendInParentheses(
@@ -96,7 +102,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
             <DropdownMenu>
                 <WithShortcut
-                    shortcut={"Control+M, M"}
+                    shortcut="Control+M, M"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -114,7 +120,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 </WithShortcut>
 
                 <WithShortcut
-                    shortcut={"Control+M, E"}
+                    shortcut="Control+M, E"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -132,7 +138,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 </WithShortcut>
 
                 <WithShortcut
-                    shortcut={"Control+M, C"}
+                    shortcut="Control+M, C"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -150,7 +156,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 </WithShortcut>
 
                 <WithShortcut
-                    shortcut={"Control+T, T"}
+                    shortcut="Control+T, T"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -164,7 +170,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 </WithShortcut>
 
                 <WithShortcut
-                    shortcut={"Control+T, E"}
+                    shortcut="Control+T, E"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -178,7 +184,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 </WithShortcut>
 
                 <WithShortcut
-                    shortcut={"Control+T, M"}
+                    shortcut="Control+T, M"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -196,9 +202,9 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
     <ButtonGroupItem>
         <WithContext key={fieldFocusedKey} let:context={fieldFocused}>
-            <WithContext key={inCodableKey} let:context={inCodable}>
+            <WithContext key={focusInCodableKey} let:context={focusInCodable}>
                 <WithShortcut
-                    shortcut={"Control+Shift+X"}
+                    shortcut="Control+Shift+X"
                     let:createShortcut
                     let:shortcutLabel
                 >
@@ -208,7 +214,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                             shortcutLabel
                         )}
                         iconSize={70}
-                        active={inCodable}
+                        active={focusInCodable}
                         disabled={!fieldFocused}
                         on:click={onHtmlEdit}
                         on:mount={withButton(createShortcut)}

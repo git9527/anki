@@ -40,14 +40,3 @@ export { default as deleteIcon } from "bootstrap-icons/icons/x.svg";
 
 export const arrowIcon =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill="transparent" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2 5l6 6 6-6"/></svg>';
-
-// image handle
-export { default as floatNoneIcon } from "@mdi/svg/svg/format-float-none.svg";
-export { default as floatLeftIcon } from "@mdi/svg/svg/format-float-left.svg";
-export { default as floatRightIcon } from "@mdi/svg/svg/format-float-right.svg";
-
-export { default as sizeActual } from "@mdi/svg/svg/image-size-select-actual.svg";
-export { default as sizeMinimized } from "@mdi/svg/svg/image-size-select-large.svg";
-
-export { default as inlineIcon } from "@mdi/svg/svg/format-wrap-square.svg";
-export { default as blockIcon } from "@mdi/svg/svg/format-wrap-top-bottom.svg";

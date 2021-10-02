@@ -9,9 +9,9 @@
 import "mathjax/es5/tex-svg-full";
 
 import type { DecoratedElement, DecoratedElementConstructor } from "./decorated";
-import { decoratedComponents } from "./decorated";
 import { nodeIsElement } from "../lib/dom";
 import { nightModeKey } from "../components/context-keys";
+import { signifyCustomInput } from "./editable";
 
 import Mathjax_svelte from "./Mathjax.svelte";
 
@@ -34,11 +34,13 @@ function moveNodeOutOfElement(
                 : element.nextSibling!;
     }
 
+    signifyCustomInput(element);
+
     return referenceNode;
 }
 
 function placeCaretAfter(node: Node): void {
-    const range = document.createRange();
+    const range = new Range();
     range.setStartAfter(node);
     range.collapse(false);
 
@@ -192,5 +194,3 @@ export const Mathjax: DecoratedElementConstructor = class Mathjax
         }
     }
 };
-
-decoratedComponents.push(Mathjax);

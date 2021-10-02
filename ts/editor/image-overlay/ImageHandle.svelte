@@ -3,24 +3,55 @@ Copyright: Ankitects Pty Ltd and contributors
 License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script lang="ts">
-    import WithDropdown from "../components/WithDropdown.svelte";
-    import ButtonDropdown from "../components/ButtonDropdown.svelte";
-    import Item from "../components/Item.svelte";
+    import WithDropdown from "../../components/WithDropdown.svelte";
+    import ButtonDropdown from "../../components/ButtonDropdown.svelte";
+    import Item from "../../components/Item.svelte";
+
+    import HandleBackground from "../HandleBackground.svelte";
+    import HandleSelection from "../HandleSelection.svelte";
+    import HandleControl from "../HandleControl.svelte";
+    import HandleLabel from "../HandleLabel.svelte";
 
     import WithImageConstrained from "./WithImageConstrained.svelte";
-    import HandleBackground from "./HandleBackground.svelte";
-    import HandleSelection from "./HandleSelection.svelte";
-    import HandleControl from "./HandleControl.svelte";
-    import HandleLabel from "./HandleLabel.svelte";
-    import ImageHandleFloatButtons from "./ImageHandleFloatButtons.svelte";
-    import ImageHandleSizeSelect from "./ImageHandleSizeSelect.svelte";
+    import FloatButtons from "./FloatButtons.svelte";
+    import SizeSelect from "./SizeSelect.svelte";
 
-    import { onDestroy } from "svelte";
+    import { tick, onDestroy } from "svelte";
+    import type CustomStyles from "../../editable/CustomStyles.svelte";
+    import type { StyleObject } from "../../editable/CustomStyles.svelte";
+    import { signifyCustomInput } from "../../editable/editable";
 
-    export let activeImage: HTMLImageElement | null = null;
+    export let customStyles: CustomStyles;
+
+    const sheetPromise = customStyles
+        .addStyleTag("imageOverlay")
+        .then((styleObject: StyleObject) => styleObject.element.sheet!);
+
     export let container: HTMLElement;
-    export let sheet: CSSStyleSheet;
-    export let isRtl: boolean = false;
+
+    let activeImage: HTMLImageElement | null = null;
+
+    async function resetHandle(): Promise<void> {
+        activeImage = null;
+        await tick();
+    }
+
+    async function maybeShowHandle(event: Event): Promise<void> {
+        await resetHandle();
+
+        if (event.target instanceof HTMLImageElement) {
+            const image = event.target;
+
+            if (!image.dataset.anki) {
+                activeImage = image;
+            }
+        }
+    }
+
+    container.addEventListener("click", maybeShowHandle);
+    container.addEventListener("blur", resetHandle);
+    container.addEventListener("key", resetHandle);
+    container.addEventListener("paste", resetHandle);
 
     $: naturalWidth = activeImage?.naturalWidth;
     $: naturalHeight = activeImage?.naturalHeight;
@@ -56,7 +87,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     let updateSelection: () => Promise<void>;
 
     async function updateSizesWithDimensions() {
-        await updateSelection();
+        await updateSelection?.();
         updateDimensions();
     }
 
@@ -128,24 +159,33 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         }
 
         activeImage!.width = width;
+        signifyCustomInput(activeImage!);
     }
 
-    onDestroy(() => resizeObserver.disconnect());
+    onDestroy(() => {
+        resizeObserver.disconnect();
+        container.removeEventListener("click", maybeShowHandle);
+        container.removeEventListener("blur", resetHandle);
+        container.removeEventListener("key", resetHandle);
+        container.removeEventListener("paste", resetHandle);
+    });
 </script>
 
-{#if sheet}
-    <WithDropdown
-        drop="down"
-        autoOpen={true}
-        autoClose={false}
-        distance={3}
-        let:createDropdown
-        let:dropdownObject
-    >
+<WithDropdown
+    drop="down"
+    autoOpen={true}
+    autoClose={false}
+    distance={3}
+    let:createDropdown
+    let:dropdownObject
+>
+    {#await sheetPromise then sheet}
         <WithImageConstrained
             {sheet}
             {container}
             {activeImage}
+            maxWidth={250}
+            maxHeight={125}
             on:update={() => {
                 updateSizesWithDimensions();
                 dropdownObject.update();
@@ -162,7 +202,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 >
                     <HandleBackground on:dblclick={toggleActualSize} />
 
-                    <HandleLabel {isRtl} on:mount={updateDimensions}>
+                    <HandleLabel on:mount={updateDimensions}>
                         <span>{actualWidth}&times;{actualHeight}</span>
                         {#if customDimensions}
                             <span>(Original: {naturalWidth}&times;{naturalHeight})</span
@@ -190,22 +230,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
                 <ButtonDropdown>
                     <div on:click={updateSizesWithDimensions}>
                         <Item>
-                            <ImageHandleFloatButtons
+                            <FloatButtons
                                 image={activeImage}
-                                {isRtl}
                                 on:update={dropdownObject.update}
                             />
                         </Item>
                         <Item>
-                            <ImageHandleSizeSelect
-                                {active}
-                                {isRtl}
-                                on:click={toggleActualSize}
-                            />
+                            <SizeSelect {active} on:click={toggleActualSize} />
                         </Item>
                     </div>
                 </ButtonDropdown>
             {/if}
         </WithImageConstrained>
-    </WithDropdown>
-{/if}
+    {/await}
+</WithDropdown>

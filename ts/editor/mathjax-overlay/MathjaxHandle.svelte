@@ -3,23 +3,46 @@ Copyright: Ankitects Pty Ltd and contributors
 License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script lang="ts">
-    import WithDropdown from "../components/WithDropdown.svelte";
-    import ButtonToolbar from "../components/ButtonToolbar.svelte";
-    import DropdownMenu from "../components/DropdownMenu.svelte";
-    import Item from "../components/Item.svelte";
+    import WithDropdown from "../../components/WithDropdown.svelte";
+    import ButtonToolbar from "../../components/ButtonToolbar.svelte";
+    import DropdownMenu from "../../components/DropdownMenu.svelte";
+    import Item from "../../components/Item.svelte";
 
-    import HandleSelection from "./HandleSelection.svelte";
-    import HandleBackground from "./HandleBackground.svelte";
-    import HandleControl from "./HandleControl.svelte";
-    import MathjaxHandleInlineBlock from "./MathjaxHandleInlineBlock.svelte";
-    import MathjaxHandleEditor from "./MathjaxHandleEditor.svelte";
+    import HandleSelection from "../HandleSelection.svelte";
+    import HandleBackground from "../HandleBackground.svelte";
+    import HandleControl from "../HandleControl.svelte";
 
-    export let activeImage: HTMLImageElement | null = null;
+    import InlineBlock from "./InlineBlock.svelte";
+    import Editor from "./Editor.svelte";
+
+    import { onDestroy, tick } from "svelte";
+
     export let container: HTMLElement;
-    export let isRtl: boolean;
+
+    let activeImage: HTMLImageElement | null = null;
+
+    async function resetHandle(): Promise<void> {
+        activeImage = null;
+        await tick();
+    }
+
+    async function maybeShowHandle(event: Event): Promise<void> {
+        await resetHandle();
+
+        if (event.target instanceof HTMLImageElement) {
+            const image = event.target;
+
+            if (image.dataset.anki === "mathjax") {
+                activeImage = image;
+            }
+        }
+    }
+
+    container.addEventListener("click", maybeShowHandle);
+    container.addEventListener("key", resetHandle);
+    container.addEventListener("paste", resetHandle);
 
     let dropdownApi: any;
-
     let removeEventListener: () => void = () => {
         /* noop */
     };
@@ -57,10 +80,19 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         return image.closest("anki-mathjax")! as HTMLElement;
     }
 
+    import { signifyCustomInput } from "../../editable/editable";
+
     function onEditorUpdate(event: CustomEvent): void {
         /* this updates the image in Mathjax.svelte */
         getComponent(activeImage!).dataset.mathjax = event.detail.mathjax;
+        signifyCustomInput(activeImage!);
     }
+
+    onDestroy(() => {
+        container.removeEventListener("click", maybeShowHandle);
+        container.removeEventListener("key", resetHandle);
+        container.removeEventListener("paste", resetHandle);
+    });
 </script>
 
 <WithDropdown
@@ -83,18 +115,15 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         </HandleSelection>
 
         <DropdownMenu>
-            <MathjaxHandleEditor
+            <Editor
                 initialValue={getComponent(activeImage).dataset.mathjax ?? ""}
                 on:update={onEditorUpdate}
+                on:codemirrorblur={resetHandle}
             />
             <div class="margin-x">
                 <ButtonToolbar>
                     <Item>
-                        <MathjaxHandleInlineBlock
-                            {activeImage}
-                            {isRtl}
-                            on:click={updateSelection}
-                        />
+                        <InlineBlock {activeImage} on:click={updateSelection} />
                     </Item>
                 </ButtonToolbar>
             </div>
