@@ -1,1 +1,0 @@
-../../bazel-bin/ts/editor/EditableAdapter.svelte.d.ts

@@ -1,1 +1,0 @@
-../../../bazel-bin/ts/editor/image-overlay/SizeSelect.svelte.d.ts

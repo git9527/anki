@@ -1,1 +1,0 @@
-../../bazel-bin/ts/editor/EditorField.svelte.d.ts

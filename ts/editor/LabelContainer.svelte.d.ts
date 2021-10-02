@@ -1,1 +1,0 @@
-../../bazel-bin/ts/editor/LabelContainer.svelte.d.ts

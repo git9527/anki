@@ -1,1 +1,0 @@
-../../bazel-bin/ts/editor/Codable.svelte.d.ts

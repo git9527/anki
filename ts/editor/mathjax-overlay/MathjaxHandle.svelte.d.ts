@@ -1,1 +1,0 @@
-../../../bazel-bin/ts/editor/mathjax-overlay/MathjaxHandle.svelte.d.ts
