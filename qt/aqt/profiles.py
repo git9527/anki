@@ -165,11 +165,14 @@ class ProfileManager:
         class Unpickler(pickle.Unpickler):
             def find_class(self, module: str, name: str) -> Any:
                 if module == "PyQt5.sip":
-                    try:
-                        import PyQt5.sip  # pylint: disable=unused-import
-                    except:
-                        # use old sip location
-                        module = "sip"
+                    if qtmajor == 5:
+                        try:
+                            import PyQt5.sip  # pylint: disable=unused-import
+                        except:
+                            # use old sip location
+                            module = "sip"
+                    else:
+                        module = "PyQt6.sip"
                 fn = super().find_class(module, name)
                 if module == "sip" and name == "_unpickle_type":
 

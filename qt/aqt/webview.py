@@ -335,9 +335,9 @@ class AnkiWebView(QWebEngineView):
         if webscale:
             return float(webscale)
 
-        if isMac:
+        if qtmajor > 5 or isMac:
             return 1
-        screen = QApplication.desktop().screen()
+        screen = QApplication.desktop().screen()  # type: ignore
         if screen is None:
             return 1
 
@@ -646,4 +646,4 @@ document.head.appendChild(style);
         Must be done on Windows prior to changing current working directory."""
         self.requiresCol = False
         self._domReady = False
-        self._page.setContent(bytes("", "ascii"))
+        self._page.setContent(cast(QByteArray, bytes("", "ascii")))
