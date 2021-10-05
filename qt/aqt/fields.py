@@ -45,13 +45,19 @@ class FieldDialog(QDialog):
             without_unicode_isolation(tr.fields_fields_for(val=self.model["name"]))
         )
         disable_help_button(self)
-        self.form.buttonBox.button(QDialogButtonBox.Help).setAutoDefault(False)
-        self.form.buttonBox.button(QDialogButtonBox.Cancel).setAutoDefault(False)
-        self.form.buttonBox.button(QDialogButtonBox.Save).setAutoDefault(False)
+        self.form.buttonBox.button(QDialogButtonBox.StandardButton.Help).setAutoDefault(
+            False
+        )
+        self.form.buttonBox.button(
+            QDialogButtonBox.StandardButton.Cancel
+        ).setAutoDefault(False)
+        self.form.buttonBox.button(QDialogButtonBox.StandardButton.Save).setAutoDefault(
+            False
+        )
         self.currentIdx: Optional[int] = None
         self.fillFields()
         self.setupSignals()
-        self.form.fieldList.setDragDropMode(QAbstractItemView.InternalMove)
+        self.form.fieldList.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.form.fieldList.dropEvent = self.onDrop  # type: ignore[assignment]
         self.form.fieldList.setCurrentRow(open_at)
         self.exec()
@@ -81,11 +87,13 @@ class FieldDialog(QDialog):
         idx = self.currentIdx
         if dropPos == idx:
             return
-        if indicatorPos == QAbstractItemView.OnViewport:  # to bottom.
+        if (
+            indicatorPos == QAbstractItemView.DropIndicatorPosition.OnViewport
+        ):  # to bottom.
             movePos = fieldList.count() - 1
-        elif indicatorPos == QAbstractItemView.AboveItem:
+        elif indicatorPos == QAbstractItemView.DropIndicatorPosition.AboveItem:
             movePos = dropPos
-        elif indicatorPos == QAbstractItemView.BelowItem:
+        elif indicatorPos == QAbstractItemView.DropIndicatorPosition.BelowItem:
             movePos = dropPos + 1
         # the item in idx is removed thus subtract 1.
         if idx < dropPos:
