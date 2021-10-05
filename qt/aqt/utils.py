@@ -903,7 +903,7 @@ def opengl_vendor() -> str | None:
             # Can't use versionFunctions there
             return None
 
-        vp = QOpenGLVersionProfile()  # type: ignore
+        vp = QOpenGLVersionProfile()  # type: ignore  # pylint: disable=undefined-variable
         vp.setVersion(2, 0)
 
         try:

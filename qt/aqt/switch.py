@@ -122,7 +122,7 @@ class Switch(QAbstractButton):
         if event.button() == Qt.MouseButton.LeftButton:
             self._animate_toggle()
 
-    def enterEvent(self, event: QEvent) -> None:
+    def enterEvent(self, event: QEnterEvent) -> None:
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         super().enterEvent(event)
 

@@ -304,7 +304,11 @@ class SidebarTreeView(QTreeView):
 
     def dropEvent(self, event: QDropEvent) -> None:
         model = self.model()
-        target_item = model.item_for_index(self.indexAt(event.pos()))
+        if qtmajor == 5:
+            pos = event.pos()  # type: ignore
+        else:
+            pos = event.position().toPoint()
+        target_item = model.item_for_index(self.indexAt(pos))
         if self.handle_drag_drop(self._selected_items(), target_item):
             event.acceptProposedAction()
 

@@ -83,7 +83,11 @@ class FieldDialog(QDialog):
     def onDrop(self, ev: QDropEvent) -> None:
         fieldList = self.form.fieldList
         indicatorPos = fieldList.dropIndicatorPosition()
-        dropPos = fieldList.indexAt(ev.pos()).row()
+        if qtmajor == 5:
+            pos = ev.pos()  # type: ignore
+        else:
+            pos = ev.position().toPoint()
+        dropPos = fieldList.indexAt(pos).row()
         idx = self.currentIdx
         if dropPos == idx:
             return
