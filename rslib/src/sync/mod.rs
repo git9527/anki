@@ -21,12 +21,16 @@ use crate::{
     deckconfig::DeckConfSchema11,
     decks::DeckSchema11,
     error::{SyncError, SyncErrorKind},
+    io::atomic_rename,
     notes::Note,
     notetype::{Notetype, NotetypeSchema11},
     prelude::*,
     revlog::RevlogEntry,
     serde::{default_on_invalid, deserialize_int_from_number},
-    storage::open_and_check_sqlite_file,
+    storage::{
+        card::data::{card_data_string, original_position_from_card_data},
+        open_and_check_sqlite_file, SchemaVersion,
+    },
     tags::{join_tags, split_tags, Tag},
 };
 
@@ -650,7 +654,7 @@ impl Collection {
     pub(crate) async fn full_upload_inner(mut self, server: Box<dyn SyncServer>) -> Result<()> {
         self.before_upload()?;
         let col_path = self.col_path.clone();
-        self.close(true)?;
+        self.close(Some(SchemaVersion::V11))?;
         server.full_upload(&col_path, false).await
     }
 
@@ -670,16 +674,14 @@ impl Collection {
         let col_folder = col_path
             .parent()
             .ok_or_else(|| AnkiError::invalid_input("couldn't get col_folder"))?;
-        self.close(false)?;
+        self.close(None)?;
         let out_file = server.full_download(Some(col_folder)).await?;
         // check file ok
         let db = open_and_check_sqlite_file(out_file.path())?;
         db.execute_batch("update col set ls=mod")?;
         drop(db);
-        // overwrite existing collection atomically
-        out_file
-            .persist(&col_path)
-            .map_err(|e| AnkiError::IoError(format!("download save failed: {}", e)))?;
+        atomic_rename(out_file, &col_path)?;
+
         Ok(())
     }
 
@@ -1097,7 +1099,7 @@ impl From<CardEntry> for Card {
             original_due: e.odue,
             original_deck_id: e.odid,
             flags: e.flags,
-            data: e.data,
+            original_position: original_position_from_card_data(&e.data),
         }
     }
 }
@@ -1122,7 +1124,7 @@ impl From<Card> for CardEntry {
             odue: e.original_due,
             odid: e.original_deck_id,
             flags: e.flags,
-            data: e.data,
+            data: card_data_string(&e),
         }
     }
 }
@@ -1544,6 +1546,7 @@ mod test {
         }
 
         // removing things like a notetype forces a full sync
+        std::thread::sleep(std::time::Duration::from_millis(1));
         col2.remove_notetype(ntid)?;
         let out = ctx.normal_sync(&mut col2).await;
         assert!(matches!(

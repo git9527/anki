@@ -7,6 +7,8 @@ from typing import Sequence
 
 import aqt
 import aqt.deckconf
+import aqt.main
+import aqt.operations
 from anki.collection import OpChanges
 from anki.models import ChangeNotetypeRequest, NotetypeId
 from anki.notes import NoteId
@@ -59,8 +61,7 @@ class ChangeNotetypeDialog(QDialog):
         self.setLayout(layout)
 
         self.web.eval(
-            f"""anki.changeNotetypePage(
-            document.getElementById('main'), {notetype_id}, {notetype_id});"""
+            f"""anki.setupChangeNotetypePage({notetype_id}, {notetype_id});"""
         )
         self.setWindowTitle(tr.browsing_change_notetype())
 

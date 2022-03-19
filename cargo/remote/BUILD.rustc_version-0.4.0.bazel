@@ -44,13 +44,13 @@ rust_library(
     ],
     tags = [
         "cargo-raze",
+        "crate-name=rustc_version",
         "manual",
-        "crate-name=rustc_version"
     ],
     version = "0.4.0",
     # buildifier: leave-alone
     deps = [
-        "@raze__semver__1_0_4//:semver",
+        "@raze__semver__1_0_6//:semver",
     ],
 )
 

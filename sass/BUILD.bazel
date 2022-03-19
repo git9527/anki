@@ -11,7 +11,6 @@ sass_library(
     visibility = ["//visibility:public"],
     deps = [
         "//sass/bootstrap",
-        "//sass/codemirror",
     ],
 )
 
@@ -72,6 +71,14 @@ sass_library(
     name = "night_mode_lib",
     srcs = [
         "night-mode.scss",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+sass_library(
+    name = "elevation_lib",
+    srcs = [
+        "elevation.scss",
     ],
     visibility = ["//visibility:public"],
 )

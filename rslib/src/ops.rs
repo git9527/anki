@@ -14,6 +14,7 @@ pub enum Op {
     Bury,
     ChangeNotetype,
     ClearUnusedTags,
+    CreateCustomStudy,
     EmptyFilteredDeck,
     FindAndReplace,
     RebuildFilteredDeck,
@@ -53,6 +54,7 @@ impl Op {
             Op::AddNote => tr.actions_add_note(),
             Op::AnswerCard => tr.actions_answer_card(),
             Op::Bury => tr.studying_bury(),
+            Op::CreateCustomStudy => tr.actions_custom_study(),
             Op::RemoveDeck => tr.decks_delete_deck(),
             Op::RemoveNote => tr.studying_delete_note(),
             Op::RenameDeck => tr.actions_rename_deck(),
@@ -91,7 +93,7 @@ impl Op {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, PartialEq, Default, Clone, Copy)]
 pub struct StateChanges {
     pub card: bool,
     pub note: bool,
@@ -103,12 +105,13 @@ pub struct StateChanges {
     pub mtime: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct OpChanges {
     pub op: Op,
     pub changes: StateChanges,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct OpOutput<T> {
     pub output: T,
     pub changes: OpChanges,
@@ -154,7 +157,7 @@ impl OpChanges {
 
     pub fn requires_study_queue_rebuild(&self) -> bool {
         let c = &self.changes;
-        c.card
+        (c.card && self.op != Op::SetFlag)
             || c.deck
             || (c.config && matches!(self.op, Op::SetCurrentDeck | Op::UpdatePreferences))
             || c.deck_config

@@ -193,7 +193,7 @@ class ThemeManager:
             buf += f"""
 QMenuBar {{
   border-bottom: 1px solid {self.color(colors.BORDER)};
-  background: {self.color(colors.WINDOW_BG)};
+  background: {self.color(colors.WINDOW_BG) if self.night_mode else "white"};
 }}
 """
             # qt bug? setting the above changes the browser sidebar
@@ -327,7 +327,11 @@ def get_windows_dark_mode() -> bool:
         HKEY_CURRENT_USER,
         r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
     )
-    return not QueryValueEx(key, "AppsUseLightTheme")[0]
+    try:
+        return not QueryValueEx(key, "AppsUseLightTheme")[0]
+    except Exception as err:
+        # key reportedly missing or set to wrong type on some systems
+        return False
 
 
 def set_macos_dark_mode(enabled: bool) -> bool:
@@ -362,6 +366,11 @@ def get_linux_dark_mode() -> bool:
         )
     except FileNotFoundError as e:
         # swallow exceptions, as gsettings may not be installed
+        print(e)
+        return False
+
+    except subprocess.CalledProcessError as e:
+        # gsettings is installed, but cannot return a value
         print(e)
         return False
 

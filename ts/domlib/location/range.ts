@@ -1,15 +1,15 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-import { getNodeCoordinates } from "./node";
 import type { CaretLocation } from "./location";
+import { getNodeCoordinates } from "./node";
 
 interface RangeCoordinatesCollapsed {
     readonly start: CaretLocation;
     readonly collapsed: true;
 }
 
-interface RangeCoordinatesContent {
+export interface RangeCoordinatesContent {
     readonly start: CaretLocation;
     readonly end: CaretLocation;
     readonly collapsed: false;
@@ -17,7 +17,7 @@ interface RangeCoordinatesContent {
 
 export type RangeCoordinates = RangeCoordinatesCollapsed | RangeCoordinatesContent;
 
-export function getRangeCoordinates(base: Node, range: Range): RangeCoordinates {
+export function getRangeCoordinates(range: Range, base: Node): RangeCoordinates {
     const startCoordinates = getNodeCoordinates(base, range.startContainer);
     const start = { coordinates: startCoordinates, offset: range.startOffset };
     const collapsed = range.collapsed;

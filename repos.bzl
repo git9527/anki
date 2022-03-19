@@ -33,12 +33,22 @@ def register_repos():
     maybe(
         http_archive,
         name = "rules_rust",
-        strip_prefix = "rules_rust-anki-2021-12-20",
+        strip_prefix = "rules_rust-adf2790f3ff063d909acd70aacdd2832756113a5",
         urls = [
-            "https://github.com/ankitects/rules_rust/archive/refs/tags/anki-2021-12-20.zip",
+            "https://github.com/bazelbuild/rules_rust/archive/adf2790f3ff063d909acd70aacdd2832756113a5.zip",
         ],
-        sha256 = "c9300cb1d1eddc5b85d5ced35f4c332b08afc7a439d2b75e696d3282b80677af",
+        sha256 = "7277e9e58ec157c233fa571e27f684402c1c0711370ef8bf379af63bd31cbe8b",
     )
+
+    # maybe(
+    #     http_archive,
+    #     name = "rules_rust",
+    #     strip_prefix = "rules_rust-anki-2021-12-20",
+    #     urls = [
+    #         "https://github.com/ankitects/rules_rust/archive/refs/tags/anki-2021-12-20.zip",
+    #     ],
+    #     sha256 = "c9300cb1d1eddc5b85d5ced35f4c332b08afc7a439d2b75e696d3282b80677af",
+    # )
 
     # python
     ##########
@@ -51,11 +61,9 @@ def register_repos():
     maybe(
         http_archive,
         name = "rules_python",
-        sha256 = "954aa89b491be4a083304a2cb838019c8b8c3720a7abb9c4cb81ac7a24230cea",
-        urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_python/releases/download/0.4.0/rules_python-0.4.0.tar.gz",
-            "https://github.com/bazelbuild/rules_python/releases/download/0.4.0/rules_python-0.4.0.tar.gz",
-        ],
+        sha256 = "a30abdfc7126d497a7698c29c46ea9901c6392d6ed315171a6df5ce433aa4502",
+        strip_prefix = "rules_python-0.6.0",
+        url = "https://github.com/bazelbuild/rules_python/archive/0.6.0.tar.gz",
     )
 
     # javascript
@@ -74,8 +82,15 @@ def register_repos():
     maybe(
         http_archive,
         name = "build_bazel_rules_nodejs",
-        sha256 = "3635797a96c7bfcd0d265dacd722a07335e64d6ded9834af8d3f1b7ba5a25bba",
-        urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/4.3.0/rules_nodejs-4.3.0.tar.gz"],
+        sha256 = "2644a66772938db8d8c760334a252f1687455daa7e188073f2d46283f2f6fbb7",
+        urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/4.6.2/rules_nodejs-4.6.2.tar.gz"],
+    )
+
+    maybe(
+        http_archive,
+        name = "rules_nodejs",
+        sha256 = "f596117040134b9497a1049efe7a785924b4ff22557669780a0fa37e22b827bd",
+        urls = ["https://github.com/bazelbuild/rules_nodejs/releases/download/4.6.2/rules_nodejs-core-4.6.2.tar.gz"],
     )
 
     # sass
@@ -100,12 +115,12 @@ def register_repos():
     ################
 
     core_i18n_repo = "anki-core-i18n"
-    core_i18n_commit = "620997d3b9cd7ca52e344259bd2a97c2776e7e6e"
-    core_i18n_zip_csum = "bda170148fc2344f54b5c1047f4ab93b109cf56318b8ce35945f7558217adc30"
+    core_i18n_commit = "0b703a565bf9767c5e7b932aadf6402a06c4c680"
+    core_i18n_zip_csum = "c2efb90cc68e536f4076b0a97c89d346605b4040c333b3488199b9774bf053c7"
 
     qtftl_i18n_repo = "anki-desktop-ftl"
-    qtftl_i18n_commit = "ced2d4e9079efef6728e8600112492f3f74abb2b"
-    qtftl_i18n_zip_csum = "90ded4ccb101ecceff0de6b4244d639624db1be7290a1a7e9d7e57fd1e1257f2"
+    qtftl_i18n_commit = "4a00451303aeafd1e205bf0b562d53a6c68c5dab"
+    qtftl_i18n_zip_csum = "32e04661b044ea3f55991cf97e3b3a2f73fd09f8aa2ecd3c17b461c11b5edf9b"
 
     i18n_build_content = """
 filegroup(
@@ -142,4 +157,99 @@ exports_files(["l10n.toml"])
             ),
         ],
         sha256 = qtftl_i18n_zip_csum,
+    )
+
+    # binary bundle
+    ################
+
+    maybe(
+        http_archive,
+        name = "pyoxidizer",
+        sha256 = "9f7951473d88c7989dc80199146f82020226a3b2425474fd33b6bcbd8fdd1b1c",
+        urls = [
+            # when changing this, the commit hash needs to be updated in qt/bundle/Cargo.toml
+            "https://github.com/ankitects/PyOxidizer/archive/refs/tags/anki-2021-12-08.tar.gz",
+        ],
+        strip_prefix = "PyOxidizer-anki-2021-12-08",
+        build_file_content = " ",
+    )
+
+    maybe(
+        http_archive,
+        name = "bundle_extras_linux_amd64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/qt-plugins-linux-amd64.tar.gz",
+        ],
+        sha256 = "cbfb41fb750ae19b381f8137bd307e1167fdc68420052977f6e1887537a131b0",
+    )
+
+    maybe(
+        http_archive,
+        name = "audio_win_amd64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/audio-win-amd64.tar.gz",
+        ],
+        sha256 = "0815a601baba05e03bc36b568cdc2332b1cf4aa17125fc33c69de125f8dd687f",
+    )
+
+    maybe(
+        http_archive,
+        name = "protobuf_wheel_mac_arm64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/protobuf-wheel-mac-arm64.tar",
+        ],
+        sha256 = "401d1cd6d949af463b3945f0d5dc887185b27fa5478cb6847bf94f680ea797b4",
+    )
+
+    maybe(
+        http_archive,
+        name = "audio_mac_amd64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/audio-mac-amd64.tar.gz",
+        ],
+        sha256 = "d9310cbd6bed09d6d36deb8b7611bffbd161628512b1bf8d7becfdf78b5cd1dd",
+    )
+
+    maybe(
+        http_archive,
+        name = "audio_mac_arm64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/audio-mac-arm64.tar.gz",
+        ],
+        sha256 = "c30a772132a16fa79d9a1e60f5dce2f91fe8077e2709a8f39ef499d49f6a4b0e",
+    )
+
+    maybe(
+        http_archive,
+        name = "pyqt6.2_mac_bundle_amd64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/pyqt6.2-mac-amd64.tar.gz",
+        ],
+        sha256 = "c7bf899eee33fcb3b5848f5d3e5fc390012efc05c2308e4349b7bbd5939c85f0",
+    )
+
+    maybe(
+        http_archive,
+        name = "pyqt6.2_mac_bundle_arm64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/pyqt6.2-mac-arm64.tar.gz",
+        ],
+        sha256 = "7a4b7d5bd65c83fd16cf7e56929183ef0d1d7bb67f9deea8f2482d7378e0ea02",
+    )
+
+    maybe(
+        http_archive,
+        name = "pyqt5.14_mac_bundle_amd64",
+        build_file_content = " ",
+        urls = [
+            "https://github.com/ankitects/anki-bundle-extras/releases/download/anki-2022-02-09/pyqt5.14-mac-amd64.tar.gz",
+        ],
+        sha256 = "474951bed79ddb9570ee4c5a6079041772551ea77e77171d9e33d6f5e7877ec1",
     )

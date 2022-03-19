@@ -17,7 +17,7 @@
     "compilerOptions": {
         "declaration": true,
         "composite": true,
-        "target": "es6",
+        "target": "es2019",
         "module": "es2020",
         "lib": [
             "es2017",
@@ -35,8 +35,8 @@
         "rootDir": "..",
         "rootDirs": [
             ".",
-            // for VS code
-            "../bazel-bin/ts"
+            // for VS code and svelte-check
+            "../.bazel/bin/ts"
         ],
         "baseUrl": ".",
         "paths": {},

@@ -6,6 +6,8 @@ from enum import Enum, auto
 from typing import Iterable, cast
 
 import aqt
+import aqt.browser
+import aqt.operations
 from anki.collection import (
     Config,
     OpChanges,
@@ -175,6 +177,8 @@ class SidebarTreeView(QTreeView):
             # block repainting during refreshing to avoid flickering
             self.setUpdatesEnabled(False)
 
+            if old_model := self.model():
+                old_model.deleteLater()
             model = SidebarModel(self, root)
             self.setModel(model)
 
@@ -325,7 +329,11 @@ class SidebarTreeView(QTreeView):
             self.tool == SidebarTool.SEARCH
             and event.button() == Qt.MouseButton.LeftButton
         ):
-            if (index := self.currentIndex()) == self.indexAt(event.pos()):
+            if qtmajor == 5:
+                pos = event.pos()  # type: ignore
+            else:
+                pos = event.position().toPoint()
+            if (index := self.currentIndex()) == self.indexAt(pos):
                 self._on_search(index)
 
     def keyPressEvent(self, event: QKeyEvent) -> None:
@@ -687,6 +695,7 @@ class SidebarTreeView(QTreeView):
     ###########################
 
     def _flags_tree(self, root: SidebarItem) -> None:
+        icon_off = "icons:flag-off-outline.svg"
         icon = "icons:flag.svg"
         icon_outline = "icons:flag-outline.svg"
 
@@ -699,6 +708,13 @@ class SidebarTreeView(QTreeView):
         )
         root.search_node = SearchNode(flag=SearchNode.FLAG_ANY)
 
+        root.add_simple(
+            tr.browsing_no_flag(),
+            icon=icon_off,
+            type=SidebarItemType.FLAG_NONE,
+            search_node=SearchNode(flag=SearchNode.FLAG_NONE),
+        )
+
         for flag in self.mw.flags.all():
             root.add_child(
                 SidebarItem(
@@ -709,13 +725,6 @@ class SidebarTreeView(QTreeView):
                     id=flag.index,
                 )
             )
-
-        root.add_simple(
-            tr.browsing_no_flag(),
-            icon=icon_outline,
-            type=SidebarItemType.FLAG_NONE,
-            search_node=SearchNode(flag=SearchNode.FLAG_NONE),
-        )
 
     # Tree: Tags
     ###########################
@@ -825,7 +834,7 @@ class SidebarTreeView(QTreeView):
 
     def _notetype_tree(self, root: SidebarItem) -> None:
         notetype_icon = "icons:newspaper.svg"
-        template_icon = "icons:iframe-braces-outline.svg"
+        template_icon = "icons:application-braces-outline.svg"
         field_icon = "icons:form-textbox.svg"
 
         root = self._section_root(

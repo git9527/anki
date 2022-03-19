@@ -1,7 +1,8 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-import type { Writable, Subscriber, Unsubscriber, Updater } from "svelte/store";
+import type { Subscriber, Unsubscriber, Updater, Writable } from "svelte/store";
+
 import { noop } from "../lib/functional";
 
 export interface NodeStore<T extends Node> extends Writable<T> {
@@ -15,12 +16,13 @@ export function nodeStore<T extends Node>(
     const subscribers: Set<Subscriber<T>> = new Set();
 
     function setUnprocessed(newNode: T): void {
-        if (!node || !node.isEqualNode(newNode)) {
-            node = newNode;
+        if (node && node.isEqualNode(newNode)) {
+            return;
+        }
 
-            for (const subscriber of subscribers) {
-                subscriber(node);
-            }
+        node = newNode;
+        for (const subscriber of subscribers) {
+            subscriber(node);
         }
     }
 

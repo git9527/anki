@@ -537,7 +537,9 @@ def ensureWidgetInScreenBoundaries(widget: QWidget) -> None:
     handle = widget.window().windowHandle()
     if not handle:
         # window has not yet been shown, retry later
-        aqt.mw.progress.timer(50, lambda: ensureWidgetInScreenBoundaries(widget), False)
+        aqt.mw.progress.timer(
+            50, lambda: ensureWidgetInScreenBoundaries(widget), False, parent=widget
+        )
         return
 
     # ensure widget is smaller than screen bounds
@@ -745,7 +747,7 @@ def tooltip(
     lab.move(aw.mapToGlobal(QPoint(0 + x_offset, aw.height() - y_offset)))
     lab.show()
     _tooltipTimer = aqt.mw.progress.timer(
-        period, closeTooltip, False, requiresCollection=False
+        period, closeTooltip, False, requiresCollection=False, parent=aw
     )
     _tooltipLabel = lab
 
@@ -755,12 +757,15 @@ def closeTooltip() -> None:
     if _tooltipLabel:
         try:
             _tooltipLabel.deleteLater()
-        except:
+        except RuntimeError:
             # already deleted as parent window closed
             pass
         _tooltipLabel = None
     if _tooltipTimer:
-        _tooltipTimer.stop()
+        try:
+            _tooltipTimer.deleteLater()
+        except RuntimeError:
+            pass
         _tooltipTimer = None
 
 
@@ -845,6 +850,23 @@ def qtMenuShortcutWorkaround(qmenu: QMenu) -> None:
 
 
 ######################################################################
+
+
+def disallow_full_screen() -> bool:
+    """Test for OpenGl on Windows, which is known to cause issues with full screen mode.
+    On Qt6, the driver is not detectable, so check if it has been set explicitly.
+    """
+    from aqt import mw
+    from aqt.profiles import VideoDriver
+
+    return is_win and (
+        (qtmajor == 5 and mw.pm.video_driver() == VideoDriver.OpenGL)
+        or (
+            qtmajor == 6
+            and not os.environ.get("ANKI_SOFTWAREOPENGL")
+            and os.environ.get("QT_OPENGL") != "software"
+        )
+    )
 
 
 def add_ellipsis_to_action_label(*actions: QAction) -> None:
@@ -1002,6 +1024,19 @@ def no_arg_trigger(func: Callable) -> Callable:
     return pyqtSlot()(func)  # type: ignore
 
 
+def is_gesture_or_zoom_event(evt: QEvent) -> bool:
+    """If the event is a gesture and/or will trigger zoom.
+
+    Includes zoom by pinching, and Ctrl-scrolling on Win and Linux.
+    """
+
+    return isinstance(evt, QNativeGestureEvent) or (
+        isinstance(evt, QWheelEvent)
+        and not is_mac
+        and KeyboardModifiersPressed().control
+    )
+
+
 class KeyboardModifiersPressed:
     "Util for type-safe checks of currently-pressed modifier keys."
 
@@ -1021,6 +1056,10 @@ class KeyboardModifiersPressed:
     @property
     def alt(self) -> bool:
         return bool(self._modifiers & Qt.KeyboardModifier.AltModifier)
+
+    @property
+    def meta(self) -> bool:
+        return bool(self._modifiers & Qt.KeyboardModifier.MetaModifier)
 
 
 # add-ons attempting to import isMac from this module :-(

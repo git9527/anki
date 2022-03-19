@@ -48,15 +48,15 @@ rust_binary(
     ],
     tags = [
         "cargo-raze",
+        "crate-name=gen_hash_test",
         "manual",
-        "crate-name=gen_hash_test"
     ],
     version = "0.10.0",
     # buildifier: leave-alone
     deps = [
         ":phf_generator",
         "@raze__phf_shared__0_10_0//:phf_shared",
-        "@raze__rand__0_8_4//:rand",
+        "@raze__rand__0_8_5//:rand",
     ],
 )
 
@@ -73,13 +73,13 @@ rust_library(
     ],
     tags = [
         "cargo-raze",
+        "crate-name=phf_generator",
         "manual",
-        "crate-name=phf_generator"
     ],
     version = "0.10.0",
     # buildifier: leave-alone
     deps = [
         "@raze__phf_shared__0_10_0//:phf_shared",
-        "@raze__rand__0_8_4//:rand",
+        "@raze__rand__0_8_5//:rand",
     ],
 )

@@ -1,10 +1,10 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-import { getNodeCoordinates } from "./node";
+import { getRange, getSelection } from "../../lib/cross-browser";
 import type { CaretLocation } from "./location";
 import { compareLocations, Position } from "./location";
-import { getSelection } from "../../lib/cross-browser";
+import { getNodeCoordinates } from "./node";
 
 export interface SelectionLocationCollapsed {
     readonly anchor: CaretLocation;
@@ -20,19 +20,17 @@ export interface SelectionLocationContent {
 
 export type SelectionLocation = SelectionLocationCollapsed | SelectionLocationContent;
 
-/* Gecko can have multiple ranges in the selection
-/* this function will get the coordinates of the latest one created */
 export function getSelectionLocation(base: Node): SelectionLocation | null {
     const selection = getSelection(base)!;
+    const range = getRange(selection);
 
-    if (selection.rangeCount === 0) {
+    if (!range) {
         return null;
     }
 
+    const collapsed = range.collapsed;
     const anchorCoordinates = getNodeCoordinates(selection.anchorNode!, base);
     const anchor = { coordinates: anchorCoordinates, offset: selection.anchorOffset };
-    /* selection.isCollapsed will always return true in shadow root in Gecko */
-    const collapsed = selection.getRangeAt(selection.rangeCount - 1).collapsed;
 
     if (collapsed) {
         return { anchor, collapsed };

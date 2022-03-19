@@ -20,6 +20,7 @@ from anki.utils import from_json_bytes, to_json_bytes
 
 from ..errors import (
     BackendIOError,
+    CustomStudyError,
     DBError,
     ExistsError,
     FilteredDeckError,
@@ -62,6 +63,7 @@ class RustBackend(RustBackendGenerated):
         self,
         langs: list[str] | None = None,
         server: bool = False,
+        log_file: str | None = None,
     ) -> None:
         # pick up global defaults if not provided
         if langs is None:
@@ -71,7 +73,7 @@ class RustBackend(RustBackendGenerated):
             preferred_langs=langs,
             server=server,
         )
-        self._backend = rsbridge.open_backend(init_msg.SerializeToString())
+        self._backend = rsbridge.open_backend(init_msg.SerializeToString(), log_file)
 
     def db_query(
         self, sql: str, args: Sequence[ValueForDB], first_row_only: bool
@@ -105,11 +107,21 @@ class RustBackend(RustBackendGenerated):
     def translate(
         self, module_index: int, message_index: int, **kwargs: str | int | float
     ) -> str:
-        return self.translate_string(
-            translate_string_in(
-                module_index=module_index, message_index=message_index, **kwargs
-            )
+        args = {
+            k: i18n_pb2.TranslateArgValue(str=v)
+            if isinstance(v, str)
+            else i18n_pb2.TranslateArgValue(number=v)
+            for k, v in kwargs.items()
+        }
+
+        input = i18n_pb2.TranslateStringRequest(
+            module_index=module_index,
+            message_index=message_index,
+            args=args,
         )
+
+        output_bytes = self.translate_string_raw(input.SerializeToString())
+        return anki.generic_pb2.String.FromString(output_bytes).val
 
     def format_time_span(
         self,
@@ -122,29 +134,15 @@ class RustBackend(RustBackendGenerated):
         )
         return self.format_timespan(seconds=seconds, context=context)
 
-    def _run_command(self, service: int, method: int, input: Any) -> bytes:
-        input_bytes = input.SerializeToString()
+    def _run_command(self, service: int, method: int, input: bytes) -> bytes:
         try:
-            return self._backend.command(service, method, input_bytes)
+            return self._backend.command(service, method, input)
         except Exception as error:
-            err_bytes = bytes(error.args[0])
+            error_bytes = bytes(error.args[0])
+
         err = backend_pb2.BackendError()
-        err.ParseFromString(err_bytes)
+        err.ParseFromString(error_bytes)
         raise backend_exception_to_pylib(err)
-
-
-def translate_string_in(
-    module_index: int, message_index: int, **kwargs: str | int | float
-) -> i18n_pb2.TranslateStringRequest:
-    args = {
-        k: i18n_pb2.TranslateArgValue(str=v)
-        if isinstance(v, str)
-        else i18n_pb2.TranslateArgValue(number=v)
-        for k, v in kwargs.items()
-    }
-    return i18n_pb2.TranslateStringRequest(
-        module_index=module_index, message_index=message_index, args=args
-    )
 
 
 class Translations(GeneratedTranslations):
@@ -217,6 +215,9 @@ def backend_exception_to_pylib(err: backend_pb2.BackendError) -> Exception:
 
     elif val == kind.UNDO_EMPTY:
         return UndoEmpty()
+
+    elif val == kind.CUSTOM_STUDY_ERROR:
+        return CustomStudyError(err.localized)
 
     else:
         # sadly we can't do exhaustiveness checking on protobuf enums

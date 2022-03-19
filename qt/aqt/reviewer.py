@@ -14,12 +14,16 @@ from enum import Enum, auto
 from typing import Any, Callable, Literal, Match, Sequence, cast
 
 import aqt
+import aqt.browser
+import aqt.operations
 from anki import hooks
 from anki.cards import Card, CardId
 from anki.collection import Config, OpChanges, OpChangesWithCount
+from anki.scheduler.base import ScheduleCardsAsNew
 from anki.scheduler.v3 import CardAnswer, NextStates, QueuedCards
 from anki.scheduler.v3 import Scheduler as V3Scheduler
 from anki.tags import MARKED_TAG
+from anki.types import assert_exhaustive
 from anki.utils import strip_html
 from aqt import AnkiQt, gui_hooks
 from aqt.browser.card_info import PreviousReviewerCardInfo, ReviewerCardInfo
@@ -30,6 +34,7 @@ from aqt.operations.scheduling import (
     answer_card,
     bury_cards,
     bury_notes,
+    forget_cards,
     set_due_date_dialog,
     suspend_cards,
     suspend_note,
@@ -46,6 +51,7 @@ from aqt.utils import askUserDialog, downArrow, qtMenuShortcutWorkaround, toolti
 class RefreshNeeded(Enum):
     NOTE_TEXT = auto()
     QUEUES = auto()
+    FLAG = auto()
 
 
 class ReviewerBottomBar:
@@ -125,7 +131,7 @@ class Reviewer:
         self.state: Literal["question", "answer", "transition", None] = None
         self._refresh_needed: RefreshNeeded | None = None
         self._v3: V3CardInfo | None = None
-        self._state_mutation_key = str(random.randint(0, 2 ** 64 - 1))
+        self._state_mutation_key = str(random.randint(0, 2**64 - 1))
         self.bottom = BottomBar(mw, mw.bottomWeb)
         self._card_info = ReviewerCardInfo(self.mw)
         self._previous_card_info = PreviousReviewerCardInfo(self.mw)
@@ -168,6 +174,14 @@ class Reviewer:
             self._redraw_current_card()
             self.mw.fade_in_webview()
             self._refresh_needed = None
+        elif self._refresh_needed is RefreshNeeded.FLAG:
+            self.card.load()
+            self._update_flag_icon()
+            # for when modified in browser
+            self.mw.fade_in_webview()
+            self._refresh_needed = None
+        elif self._refresh_needed:
+            assert_exhaustive(self._refresh_needed)
 
     def op_executed(
         self, changes: OpChanges, handler: object | None, focused: bool
@@ -177,6 +191,8 @@ class Reviewer:
                 self._refresh_needed = RefreshNeeded.QUEUES
             elif changes.note_text:
                 self._refresh_needed = RefreshNeeded.NOTE_TEXT
+            elif changes.card:
+                self._refresh_needed = RefreshNeeded.FLAG
 
         if focused and self._refresh_needed:
             self.refresh_if_needed()
@@ -459,6 +475,7 @@ class Reviewer:
             ("-", self.bury_current_card),
             ("!", self.suspend_current_note),
             ("@", self.suspend_current_card),
+            ("Ctrl+Alt+N", self.forget_current_card),
             ("Ctrl+Alt+E", self.on_create_copy),
             ("Ctrl+Delete", self.delete_current_note),
             ("Ctrl+Shift+D", self.on_set_due),
@@ -915,6 +932,7 @@ time = %(time)d;
                 ],
             ],
             [tr.studying_bury_card(), "-", self.bury_current_card],
+            [tr.actions_forget_card(), "Ctrl+Alt+N", self.forget_current_card],
             [
                 tr.actions_with_ellipsis(action=tr.actions_set_due_date()),
                 "Ctrl+Shift+D",
@@ -951,7 +969,7 @@ time = %(time)d;
 
         gui_hooks.reviewer_will_show_context_menu(self, m)
         qtMenuShortcutWorkaround(m)
-        m.exec(QCursor.pos())
+        m.popup(QCursor.pos())
 
     def _addMenuItems(self, m: QMenu, rows: Sequence) -> None:
         for row in rows:
@@ -986,10 +1004,6 @@ time = %(time)d;
         self._card_info.toggle()
 
     def set_flag_on_current_card(self, desired_flag: int) -> None:
-        def redraw_flag(out: OpChangesWithCount) -> None:
-            self.card.load()
-            self._update_flag_icon()
-
         # need to toggle off?
         if self.card.user_flag() == desired_flag:
             flag = 0
@@ -997,8 +1011,8 @@ time = %(time)d;
             flag = desired_flag
 
         set_card_flag(parent=self.mw, card_ids=[self.card.id], flag=flag).success(
-            redraw_flag
-        ).run_in_background(initiator=self)
+            lambda _: None
+        ).run_in_background()
 
     def set_flag_func(self, desired_flag: int) -> Callable:
         return lambda: self.set_flag_on_current_card(desired_flag)
@@ -1052,6 +1066,14 @@ time = %(time)d;
         bury_cards(parent=self.mw, card_ids=[self.card.id],).success(
             lambda res: tooltip(tr.studying_cards_buried(count=res.count))
         ).run_in_background()
+
+    def forget_current_card(self) -> None:
+        if op := forget_cards(
+            parent=self.mw,
+            card_ids=[self.card.id],
+            context=ScheduleCardsAsNew.Context.REVIEWER,
+        ):
+            op.run_in_background()
 
     def on_create_copy(self) -> None:
         if self.card:

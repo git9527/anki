@@ -7,6 +7,7 @@ from concurrent.futures._base import Future
 from typing import Any, Callable, Generic, Protocol, TypeVar, Union
 
 import aqt
+import aqt.gui_hooks
 from anki.collection import (
     Collection,
     OpChanges,
@@ -130,7 +131,7 @@ class CollectionOp(Generic[ResultWithChanges]):
         if isinstance(result, OpChanges):
             changes = result
         else:
-            changes = result.changes
+            changes = result.changes  # type: ignore[union-attr]
 
         # fire new hook
         aqt.gui_hooks.operation_did_execute(changes, handler)

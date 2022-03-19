@@ -18,6 +18,7 @@ service CollectionService {
   rpc MergeUndoEntries(generic.UInt32) returns (OpChanges);
   rpc LatestProgress(generic.Empty) returns (Progress);
   rpc SetWantsAbort(generic.Empty) returns (generic.Empty);
+  rpc AwaitBackupCompletion(generic.Empty) returns (generic.Empty);
 }
 
 message OpenCollectionRequest {
@@ -29,6 +30,11 @@ message OpenCollectionRequest {
 
 message CloseCollectionRequest {
   bool downgrade_to_schema11 = 1;
+  // Skip backup if unset
+  optional string backup_folder = 2;
+  // Skip backup if one has been created in the last x seconds.
+  // If unset a default value is used.
+  optional uint64 minimum_backup_interval = 3;
 }
 
 message CheckDatabaseResponse {
@@ -107,5 +113,7 @@ message Progress {
     FullSync full_sync = 4;
     NormalSync normal_sync = 5;
     DatabaseCheck database_check = 6;
+    string importing = 7;
+    uint32 exporting = 8;
   }
 }

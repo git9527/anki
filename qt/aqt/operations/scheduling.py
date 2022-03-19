@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Sequence
 
 import aqt
+import aqt.forms
 from anki.cards import CardId
 from anki.collection import (
     CARD_TYPE_NEW,
@@ -17,7 +18,8 @@ from anki.collection import (
 )
 from anki.decks import DeckId
 from anki.notes import NoteId
-from anki.scheduler import FilteredDeckForUpdate, UnburyDeck
+from anki.scheduler import CustomStudyRequest, FilteredDeckForUpdate, UnburyDeck
+from anki.scheduler.base import ScheduleCardsAsNew
 from anki.scheduler.v3 import CardAnswer
 from anki.scheduler.v3 import Scheduler as V3Scheduler
 from aqt.operations import CollectionOp
@@ -64,10 +66,37 @@ def set_due_date_dialog(
 
 
 def forget_cards(
-    *, parent: QWidget, card_ids: Sequence[CardId]
-) -> CollectionOp[OpChanges]:
+    *,
+    parent: QWidget,
+    card_ids: Sequence[CardId],
+    context: ScheduleCardsAsNew.Context.V | None = None,
+) -> CollectionOp[OpChanges] | None:
+    assert aqt.mw
+
+    dialog = QDialog(parent)
+    disable_help_button(dialog)
+    form = aqt.forms.forget.Ui_Dialog()
+    form.setupUi(dialog)
+
+    if context is not None:
+        defaults = aqt.mw.col.sched.schedule_cards_as_new_defaults(context)
+        form.restore_position.setChecked(defaults.restore_position)
+        form.reset_counts.setChecked(defaults.reset_counts)
+
+    if not dialog.exec():
+        return None
+
+    restore_position = form.restore_position.isChecked()
+    reset_counts = form.reset_counts.isChecked()
+
     return CollectionOp(
-        parent, lambda col: col.sched.schedule_cards_as_new(card_ids)
+        parent,
+        lambda col: col.sched.schedule_cards_as_new(
+            card_ids,
+            restore_position=restore_position,
+            reset_counts=reset_counts,
+            context=context,
+        ),
     ).success(
         lambda _: tooltip(
             tr.scheduling_forgot_cards(cards=len(card_ids)), parent=parent
@@ -228,3 +257,11 @@ def answer_card(
         return col.sched.answer_card(answer)
 
     return CollectionOp(parent, answer_v3)
+
+
+def custom_study(
+    *,
+    parent: QWidget,
+    request: CustomStudyRequest,
+) -> CollectionOp[OpChanges]:
+    return CollectionOp(parent, lambda col: col.sched.custom_study(request))

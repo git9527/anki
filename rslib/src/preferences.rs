@@ -19,6 +19,7 @@ impl Collection {
             scheduling: Some(self.get_scheduling_preferences()?),
             reviewing: Some(self.get_reviewing_preferences()?),
             editing: Some(self.get_editing_preferences()?),
+            backups: Some(self.get_backups()),
         })
     }
 
@@ -37,6 +38,9 @@ impl Collection {
         }
         if let Some(editing) = prefs.editing {
             self.set_editing_preferences(editing)?;
+        }
+        if let Some(backups) = prefs.backups {
+            self.set_backups(backups)?;
         }
         Ok(())
     }
@@ -132,6 +136,7 @@ impl Collection {
             paste_images_as_png: self.get_config_bool(BoolKey::PasteImagesAsPng),
             paste_strips_formatting: self.get_config_bool(BoolKey::PasteStripsFormatting),
             default_search_text: self.get_config_string(StringKey::DefaultSearchText),
+            ignore_accents_in_search: self.get_config_bool(BoolKey::IgnoreAccentsInSearch),
         })
     }
 
@@ -144,6 +149,7 @@ impl Collection {
         self.set_config_bool_inner(BoolKey::PasteImagesAsPng, s.paste_images_as_png)?;
         self.set_config_bool_inner(BoolKey::PasteStripsFormatting, s.paste_strips_formatting)?;
         self.set_config_string_inner(StringKey::DefaultSearchText, &s.default_search_text)?;
+        self.set_config_bool_inner(BoolKey::IgnoreAccentsInSearch, s.ignore_accents_in_search)?;
         Ok(())
     }
 }

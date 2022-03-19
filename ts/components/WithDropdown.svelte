@@ -4,8 +4,8 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script lang="ts">
     import Dropdown from "bootstrap/js/dist/dropdown";
+    import { onDestroy, setContext } from "svelte";
 
-    import { setContext, onDestroy } from "svelte";
     import { dropdownKey } from "./context-keys";
 
     export let autoOpen = false;
@@ -85,12 +85,15 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
         api = {
             show: dropdown.show.bind(dropdown),
-            toggle: dropdown.toggle.bind(dropdown),
+            // TODO this is quite confusing, but having a noop function fixes Bootstrap
+            // in the deck-options when not including Bootstrap via <script />
+            toggle: () => {},
+            /* toggle: dropdown.toggle.bind(dropdown), */
             hide: dropdown.hide.bind(dropdown),
             update: dropdown.update.bind(dropdown),
             dispose: dropdown.dispose.bind(dropdown),
             isVisible,
-        };
+        } as any;
 
         return api;
     }
@@ -98,7 +101,7 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     onDestroy(() => dropdown?.dispose());
 </script>
 
-<div class={dropClass}>
+<div class="with-dropdown {dropClass}">
     <slot {createDropdown} dropdownObject={api} />
 </div>
 

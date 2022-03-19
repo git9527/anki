@@ -61,14 +61,14 @@ rust_library(
     ],
     tags = [
         "cargo-raze",
+        "crate-name=zip",
         "manual",
-        "crate-name=zip"
     ],
     version = "0.5.13",
     # buildifier: leave-alone
     deps = [
         "@raze__byteorder__1_4_3//:byteorder",
-        "@raze__crc32fast__1_3_0//:crc32fast",
+        "@raze__crc32fast__1_3_2//:crc32fast",
         "@raze__flate2__1_0_22//:flate2",
         "@raze__thiserror__1_0_30//:thiserror",
         "@raze__time__0_1_44//:time",

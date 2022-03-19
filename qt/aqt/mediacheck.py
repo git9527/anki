@@ -9,6 +9,7 @@ from concurrent.futures import Future
 from typing import Iterable, Sequence, TypeVar
 
 import aqt
+import aqt.progress
 from anki.collection import Collection, SearchNode
 from anki.errors import Interrupted
 from anki.media import CheckMediaResponse
@@ -55,7 +56,7 @@ class MediaChecker:
 
     def _set_progress_enabled(self, enabled: bool) -> None:
         if self._progress_timer:
-            self._progress_timer.stop()
+            self._progress_timer.deleteLater()
             self._progress_timer = None
         if enabled:
             self._progress_timer = timer = QTimer()

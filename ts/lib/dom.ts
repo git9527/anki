@@ -1,16 +1,30 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import { getSelection } from "./cross-browser";
+
 export function nodeIsElement(node: Node): node is Element {
     return node.nodeType === Node.ELEMENT_NODE;
+}
+
+/**
+ * In the web this is probably equivalent to `nodeIsElement`, but this is
+ * convenient to convince Typescript.
+ */
+export function nodeIsCommonElement(node: Node): node is HTMLElement | SVGElement {
+    return node instanceof HTMLElement || node instanceof SVGElement;
 }
 
 export function nodeIsText(node: Node): node is Text {
     return node.nodeType === Node.TEXT_NODE;
 }
 
+export function nodeIsComment(node: Node): node is Comment {
+    return node.nodeType === Node.COMMENT_NODE;
+}
+
 // https://developer.mozilla.org/en-US/docs/Web/HTML/Block-level_elements
-const BLOCK_ELEMENTS = [
+export const BLOCK_ELEMENTS = [
     "ADDRESS",
     "ARTICLE",
     "ASIDE",
@@ -46,12 +60,22 @@ const BLOCK_ELEMENTS = [
     "UL",
 ];
 
+export function hasBlockAttribute(element: Element): boolean {
+    return element.hasAttribute("block") && element.getAttribute("block") !== "false";
+}
+
 export function elementIsBlock(element: Element): boolean {
-    return BLOCK_ELEMENTS.includes(element.tagName);
+    return BLOCK_ELEMENTS.includes(element.tagName) || hasBlockAttribute(element);
+}
+
+export const NO_SPLIT_TAGS = ["RUBY"];
+
+export function elementShouldNotBeSplit(element: Element): boolean {
+    return elementIsBlock(element) || NO_SPLIT_TAGS.includes(element.tagName);
 }
 
 // https://developer.mozilla.org/en-US/docs/Glossary/Empty_element
-const EMPTY_ELEMENTS = [
+export const EMPTY_ELEMENTS = [
     "AREA",
     "BASE",
     "BR",
@@ -94,25 +118,10 @@ export function fragmentToString(fragment: DocumentFragment): string {
     return html;
 }
 
-export const NO_SPLIT_TAGS = ["RUBY"];
-
-export function elementShouldNotBeSplit(element: Element): boolean {
-    return elementIsBlock(element) || NO_SPLIT_TAGS.includes(element.tagName);
-}
-
-export function caretToEnd(node: Node): void {
-    const range = new Range();
-    range.selectNodeContents(node);
-    range.collapse(false);
-    const selection = (node.getRootNode() as Document | ShadowRoot).getSelection()!;
-    selection.removeAllRanges();
-    selection.addRange(range);
-}
-
 const getAnchorParent =
     <T extends Element>(predicate: (element: Element) => element is T) =>
-    (root: DocumentOrShadowRoot): T | null => {
-        const anchor = root.getSelection()?.anchorNode;
+    (root: Node): T | null => {
+        const anchor = getSelection(root)?.anchorNode;
 
         if (!anchor) {
             return null;

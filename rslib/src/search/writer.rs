@@ -14,32 +14,6 @@ use crate::{
     text::escape_anki_wildcards,
 };
 
-#[derive(Debug, PartialEq)]
-pub enum BoolSeparator {
-    And,
-    Or,
-}
-
-/// Take an existing search, and AND/OR it with the provided additional search.
-/// This is required because when the user has "a AND b" in an existing search and
-/// wants to add "c", we want "a AND b AND c", not "(a AND b) AND C", which is what we'd
-/// get if we tried to join the existing search string with a new SearchTerm on the
-/// client side.
-pub fn concatenate_searches(
-    sep: BoolSeparator,
-    mut existing: Vec<Node>,
-    additional: Node,
-) -> String {
-    if !existing.is_empty() {
-        existing.push(match sep {
-            BoolSeparator::And => Node::And,
-            BoolSeparator::Or => Node::Or,
-        });
-    }
-    existing.push(additional);
-    write_nodes(&existing)
-}
-
 /// Given an existing parsed search, if the provided `replacement` is a single search node such
 /// as a deck:xxx search, replace any instances of that search in `existing` with the new value.
 /// Then return the possibly modified first search as a string.
@@ -65,7 +39,7 @@ pub fn replace_search_node(mut existing: Vec<Node>, replacement: Node) -> String
     write_nodes(&existing)
 }
 
-pub fn write_nodes(nodes: &[Node]) -> String {
+pub(super) fn write_nodes(nodes: &[Node]) -> String {
     nodes.iter().map(write_node).collect()
 }
 
@@ -83,7 +57,7 @@ fn write_node(node: &Node) -> String {
 fn write_search_node(node: &SearchNode) -> String {
     use SearchNode::*;
     match node {
-        UnqualifiedText(s) => maybe_quote(&s.replace(":", "\\:")),
+        UnqualifiedText(s) => maybe_quote(&s.replace(':', "\\:")),
         SingleField { field, text, is_re } => write_single_field(field, text, *is_re),
         AddedInDays(u) => format!("added:{}", u),
         EditedInDays(u) => format!("edited:{}", u),
@@ -96,7 +70,7 @@ fn write_search_node(node: &SearchNode) -> String {
         NotetypeId(NotetypeIdType(i)) => format!("mid:{}", i),
         Notetype(s) => maybe_quote(&format!("note:{}", s)),
         Rated { days, ease } => write_rated(days, ease),
-        Tag(s) => maybe_quote(&format!("tag:{}", s)),
+        Tag { tag, is_re } => write_single_field("tag", tag, *is_re),
         Duplicates { notetype_id, text } => write_dupe(notetype_id, text),
         State(k) => write_state(k),
         Flag(u) => format!("flag:{}", u),
@@ -113,9 +87,9 @@ fn write_search_node(node: &SearchNode) -> String {
 /// Escape double quotes and wrap in double quotes if necessary.
 fn maybe_quote(txt: &str) -> String {
     if needs_quotation(txt) {
-        format!("\"{}\"", txt.replace("\"", "\\\""))
+        format!("\"{}\"", txt.replace('\"', "\\\""))
     } else {
-        txt.replace("\"", "\\\"")
+        txt.replace('\"', "\\\"")
     }
 }
 
@@ -128,14 +102,15 @@ fn needs_quotation(txt: &str) -> bool {
     RE.is_match(txt)
 }
 
+/// Also used by tag search, which has the same syntax.
 fn write_single_field(field: &str, text: &str, is_re: bool) -> String {
     let re = if is_re { "re:" } else { "" };
     let text = if !is_re && text.starts_with("re:") {
-        text.replacen(":", "\\:", 1)
+        text.replacen(':', "\\:", 1)
     } else {
         text.to_string()
     };
-    maybe_quote(&format!("{}:{}{}", field.replace(":", "\\:"), re, &text))
+    maybe_quote(&format!("{}:{}{}", field.replace(':', "\\:"), re, &text))
 }
 
 fn write_template(template: &TemplateKind) -> String {
@@ -156,7 +131,7 @@ fn write_rated(days: &u32, ease: &RatingKind) -> String {
 
 /// Escape double quotes and backslashes: \"
 fn write_dupe(notetype_id: &NotetypeId, text: &str) -> String {
-    let esc = text.replace(r"\", r"\\");
+    let esc = text.replace('\\', r"\\");
     maybe_quote(&format!("dupe:{},{}", notetype_id, esc))
 }
 
@@ -232,42 +207,6 @@ mod test {
         assert_eq!(r#""aNd" "oR""#, normalize_search(r#""aNd" "oR""#).unwrap());
         // normalize numbers
         assert_eq!("prop:ease>1", normalize_search("prop:ease>1.0").unwrap());
-    }
-
-    #[test]
-    fn concatenating() {
-        assert_eq!(
-            concatenate_searches(
-                BoolSeparator::And,
-                vec![Node::Search(SearchNode::UnqualifiedText("foo".to_string()))],
-                Node::Search(SearchNode::UnqualifiedText("bar".to_string()))
-            ),
-            "foo bar",
-        );
-        assert_eq!(
-            concatenate_searches(
-                BoolSeparator::Or,
-                vec![Node::Search(SearchNode::UnqualifiedText("foo".to_string()))],
-                Node::Search(SearchNode::UnqualifiedText("bar".to_string()))
-            ),
-            "foo OR bar",
-        );
-        assert_eq!(
-            concatenate_searches(
-                BoolSeparator::Or,
-                vec![Node::Search(SearchNode::WholeCollection)],
-                Node::Search(SearchNode::UnqualifiedText("bar".to_string()))
-            ),
-            "deck:* OR bar",
-        );
-        assert_eq!(
-            concatenate_searches(
-                BoolSeparator::Or,
-                vec![],
-                Node::Search(SearchNode::UnqualifiedText("bar".to_string()))
-            ),
-            "bar",
-        );
     }
 
     #[test]

@@ -17,6 +17,7 @@ from __future__ import annotations
 from typing import Literal, Optional, Sequence
 
 from anki import scheduler_pb2
+from anki._legacy import deprecated
 from anki.cards import Card
 from anki.collection import OpChanges
 from anki.consts import *
@@ -86,7 +87,8 @@ class Scheduler(SchedulerBaseWithLegacy):
     def answer_card(self, input: CardAnswer) -> OpChanges:
         "Update card to provided state, and remove it from queue."
         self.reps += 1
-        return self.col._backend.answer_card(input=input)
+        op_bytes = self.col._backend.answer_card_raw(input.SerializeToString())
+        return OpChanges.FromString(op_bytes)
 
     def state_is_leech(self, new_state: SchedulingState) -> bool:
         "True if new state marks the card as a leech."
@@ -238,8 +240,7 @@ class Scheduler(SchedulerBaseWithLegacy):
         except DBError:
             return []
 
-    # used by custom study; will likely be rolled into a separate routine
-    # in the future
+    @deprecated(info="no longer used by Anki; will be removed in the future")
     def totalNewForCurrentDeck(self) -> int:
         return self.col.db.scalar(
             f"""

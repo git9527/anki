@@ -19,7 +19,6 @@ editing-fields = Fields
 editing-float-left = Float left
 editing-float-right = Float right
 editing-float-none = No float
-editing-html-editor = HTML Editor
 editing-indent = Increase indent
 editing-italic-text = Italic text
 editing-jump-to-tags-with-ctrlandshiftandt = Jump to tags with Ctrl+Shift+T
@@ -37,17 +36,27 @@ editing-outdent = Decrease indent
 editing-paste = Paste
 editing-record-audio = Record audio
 editing-remove-formatting = Remove formatting
-editing-set-text-color = Set text color
-editing-set-text-highlight-color = Set text highlight color
+editing-select-remove-formatting = Select formatting to remove
 editing-show-duplicates = Show Duplicates
 editing-subscript = Subscript
 editing-superscript = Superscript
 editing-tags = Tags
+editing-tags-add = Add tag
+editing-tags-copy = Copy tags
+editing-tags-remove = Remove tags
+editing-tags-select-all = Select all tags
+editing-text-color = Text color
+editing-text-highlight-color = Text highlight color
 editing-to-make-a-cloze-deletion-on = To make a cloze deletion on an existing note, you need to change it to a cloze type first, via 'Notes>Change Note Type'
+editing-toggle-html-editor = Toggle HTML Editor
 editing-toggle-sticky = Toggle sticky
+editing-toggle-visual-editor = Toggle Visual Editor
 editing-underline-text = Underline text
 editing-unordered-list = Unordered list
 editing-warning-cloze-deletions-will-not-work = Warning, cloze deletions will not work until you switch the type at the top to Cloze.
 
 ## You don't need to translate these strings, as they will be replaced with different ones soon.
 
+editing-html-editor = HTML Editor
+editing-set-text-color = Set text color
+editing-set-text-highlight-color = Set text highlight color

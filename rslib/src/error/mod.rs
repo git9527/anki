@@ -6,10 +6,10 @@ mod filtered;
 mod network;
 mod search;
 
-use std::{fmt::Display, io};
+use std::{fmt::Display, io, path::Path};
 
 pub use db::{DbError, DbErrorKind};
-pub use filtered::FilteredDeckError;
+pub use filtered::{CustomStudyError, FilteredDeckError};
 pub use network::{NetworkError, NetworkErrorKind, SyncError, SyncErrorKind};
 pub use search::{ParseError, SearchErrorKind};
 use tempfile::PathPersistError;
@@ -24,6 +24,7 @@ pub enum AnkiError {
     TemplateError(String),
     TemplateSaveError(TemplateSaveError),
     IoError(String),
+    FileIoError(FileIoError),
     DbError(DbError),
     NetworkError(NetworkError),
     SyncError(SyncError),
@@ -41,6 +42,9 @@ pub enum AnkiError {
     UndoEmpty,
     MultipleNotetypesSelected,
     DatabaseCheckRequired,
+    MediaCheckRequired,
+    CustomStudyError(CustomStudyError),
+    ImportError(ImportError),
 }
 
 impl Display for AnkiError {
@@ -94,6 +98,9 @@ impl AnkiError {
             AnkiError::InvalidRegex(err) => format!("<pre>{}</pre>", err),
             AnkiError::MultipleNotetypesSelected => tr.errors_multiple_notetypes_selected().into(),
             AnkiError::DatabaseCheckRequired => tr.errors_please_check_database().into(),
+            AnkiError::MediaCheckRequired => tr.errors_please_check_media().into(),
+            AnkiError::CustomStudyError(err) => err.localized_description(tr),
+            AnkiError::ImportError(err) => err.localized_description(tr),
             AnkiError::IoError(_)
             | AnkiError::JsonError(_)
             | AnkiError::ProtoError(_)
@@ -103,6 +110,9 @@ impl AnkiError {
             | AnkiError::NotFound
             | AnkiError::Existing
             | AnkiError::UndoEmpty => format!("{:?}", self),
+            AnkiError::FileIoError(err) => {
+                format!("{}: {}", err.path, err.error)
+            }
         }
     }
 }
@@ -173,4 +183,44 @@ pub enum TemplateSaveErrorDetails {
     NoSuchField,
     MissingCloze,
     ExtraneousCloze,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ImportError {
+    Corrupt,
+    TooNew,
+    MediaImportFailed(String),
+}
+
+impl ImportError {
+    fn localized_description(&self, tr: &I18n) -> String {
+        match self {
+            ImportError::Corrupt => tr.importing_the_provided_file_is_not_a(),
+            ImportError::TooNew => tr.errors_collection_too_new(),
+            ImportError::MediaImportFailed(err) => tr.importing_failed_to_import_media_file(err),
+        }
+        .into()
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+
+pub struct FileIoError {
+    pub path: String,
+    pub error: String,
+}
+
+impl AnkiError {
+    pub(crate) fn file_io_error<P: AsRef<Path>>(err: std::io::Error, path: P) -> Self {
+        AnkiError::FileIoError(FileIoError::new(err, path.as_ref()))
+    }
+}
+
+impl FileIoError {
+    pub fn new(err: std::io::Error, path: &Path) -> FileIoError {
+        FileIoError {
+            path: path.to_string_lossy().to_string(),
+            error: err.to_string(),
+        }
+    }
 }

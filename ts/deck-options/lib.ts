@@ -1,28 +1,12 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
-import { DeckConfig } from "../lib/proto";
-import { postRequest } from "../lib/postrequest";
-import { Writable, writable, get, Readable, readable } from "svelte/store";
-import { isEqual, cloneDeep } from "lodash-es";
+import { cloneDeep, isEqual } from "lodash-es";
+import { get, Readable, readable, Writable, writable } from "svelte/store";
+
 import { localeCompare } from "../lib/i18n";
+import { DeckConfig, deckConfig } from "../lib/proto";
 import type { DynamicSvelteComponent } from "../sveltelib/dynamicComponent";
-
-export async function getDeckOptionsInfo(
-    deckId: number,
-): Promise<DeckConfig.DeckConfigsForUpdate> {
-    return DeckConfig.DeckConfigsForUpdate.decode(
-        await postRequest("/_anki/deckConfigsForUpdate", JSON.stringify({ deckId })),
-    );
-}
-
-export async function saveDeckOptions(
-    input: DeckConfig.UpdateDeckConfigsRequest,
-): Promise<void> {
-    const data: Uint8Array = DeckConfig.UpdateDeckConfigsRequest.encode(input).finish();
-    await postRequest("/_anki/updateDeckConfigs", data);
-    return;
-}
 
 export type DeckOptionsId = number;
 
@@ -44,15 +28,14 @@ export interface ConfigListEntry {
     current: boolean;
 }
 
-type ConfigInner = DeckConfig.DeckConfig.Config;
 export class DeckOptionsState {
-    readonly currentConfig: Writable<ConfigInner>;
+    readonly currentConfig: Writable<DeckConfig.DeckConfig.Config>;
     readonly currentAuxData: Writable<Record<string, unknown>>;
     readonly configList: Readable<ConfigListEntry[]>;
     readonly parentLimits: Readable<ParentLimits>;
     readonly cardStateCustomizer: Writable<string>;
     readonly currentDeck: DeckConfig.DeckConfigsForUpdate.CurrentDeck;
-    readonly defaults: ConfigInner;
+    readonly defaults: DeckConfig.DeckConfig.Config;
     readonly addonComponents: Writable<DynamicSvelteComponent[]>;
     readonly v3Scheduler: boolean;
     readonly haveAddons: boolean;
@@ -68,11 +51,11 @@ export class DeckOptionsState {
 
     constructor(targetDeckId: number, data: DeckConfig.DeckConfigsForUpdate) {
         this.targetDeckId = targetDeckId;
-        this.currentDeck =
-            data.currentDeck as DeckConfig.DeckConfigsForUpdate.CurrentDeck;
-        this.defaults = data.defaults!.config! as ConfigInner;
+        this.currentDeck = data.currentDeck!;
+        this.defaults = data.defaults!.config!;
         this.configs = data.allConfig.map((config) => {
-            const configInner = config.config as DeckConfig.DeckConfig;
+            const configInner = config.config!;
+
             return {
                 config: configInner,
                 useCount: config.useCount!,
@@ -152,7 +135,7 @@ export class DeckOptionsState {
         const config = DeckConfig.DeckConfig.create({
             id: 0,
             name: uniqueName,
-            config: cloneDeep(source),
+            config: DeckConfig.DeckConfig.Config.create(cloneDeep(source)),
         });
         const configWithCount = { config, useCount: 0 };
         this.configs.push(configWithCount);
@@ -185,7 +168,9 @@ export class DeckOptionsState {
         this.updateConfigList();
     }
 
-    dataForSaving(applyToChildren: boolean): DeckConfig.UpdateDeckConfigsRequest {
+    dataForSaving(
+        applyToChildren: boolean,
+    ): NonNullable<DeckConfig.IUpdateDeckConfigsRequest> {
         const modifiedConfigsExcludingCurrent = this.configs
             .map((c) => c.config)
             .filter((c, idx) => {
@@ -199,20 +184,24 @@ export class DeckOptionsState {
             // current must come last, even if unmodified
             this.configs[this.selectedIdx].config,
         ];
-        return DeckConfig.UpdateDeckConfigsRequest.create({
+        return {
             targetDeckId: this.targetDeckId,
             removedConfigIds: this.removedConfigs,
             configs,
             applyToChildren,
             cardStateCustomizer: get(this.cardStateCustomizer),
-        });
+        };
     }
 
     async save(applyToChildren: boolean): Promise<void> {
-        await saveDeckOptions(this.dataForSaving(applyToChildren));
+        await deckConfig.updateDeckConfigs(
+            DeckConfig.UpdateDeckConfigsRequest.create(
+                this.dataForSaving(applyToChildren),
+            ),
+        );
     }
 
-    private onCurrentConfigChanged(config: ConfigInner): void {
+    private onCurrentConfigChanged(config: DeckConfig.DeckConfig.Config): void {
         const configOuter = this.configs[this.selectedIdx].config;
         if (!isEqual(config, configOuter.config)) {
             configOuter.config = config;
@@ -254,13 +243,13 @@ export class DeckOptionsState {
     }
 
     /// Returns a copy of the currently selected config.
-    private getCurrentConfig(): ConfigInner {
-        return cloneDeep(this.configs[this.selectedIdx].config.config as ConfigInner);
+    private getCurrentConfig(): DeckConfig.DeckConfig.Config {
+        return cloneDeep(this.configs[this.selectedIdx].config.config!);
     }
 
     /// Extra data associated with current config (for add-ons)
     private getCurrentAuxData(): Record<string, unknown> {
-        const conf = this.configs[this.selectedIdx].config.config as ConfigInner;
+        const conf = this.configs[this.selectedIdx].config.config!;
         return bytesToObject(conf.other);
     }
 
@@ -301,20 +290,21 @@ export class DeckOptionsState {
 
 function bytesToObject(bytes: Uint8Array): Record<string, unknown> {
     if (!bytes.length) {
-        return {} as Record<string, unknown>;
+        return {};
     }
 
     let obj: Record<string, unknown>;
+
     try {
-        obj = JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
+        obj = JSON.parse(new TextDecoder().decode(bytes));
     } catch (err) {
         console.log(`invalid json in deck config`);
-        return {} as Record<string, unknown>;
+        return {};
     }
 
     if (obj.constructor !== Object) {
         console.log(`invalid object in deck config`);
-        return {} as Record<string, unknown>;
+        return {};
     }
 
     return obj;

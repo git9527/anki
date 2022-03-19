@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import aqt
 import aqt.deckconf
+import aqt.main
 from anki.cards import Card
 from anki.decks import DeckDict, DeckId
 from anki.lang import without_unicode_isolation
@@ -51,8 +52,7 @@ class DeckOptionsDialog(QDialog):
         self.setLayout(layout)
 
         self.web.eval(
-            f"""const $deckOptions = anki.deckOptions(
-            document.getElementById('main'), {self._deck["id"]});"""
+            f"""const $deckOptions = anki.setupDeckOptions({self._deck["id"]});"""
         )
         self.setWindowTitle(
             without_unicode_isolation(tr.actions_options_for(val=self._deck["name"]))
@@ -96,7 +96,7 @@ def _deck_prompt_dialog(decks: list[DeckDict]) -> None:
     qconnect(button.clicked, diag.close)
     box.addWidget(button)
     diag.setLayout(box)
-    diag.exec()
+    diag.open()
 
 
 def display_options_for_deck_id(deck_id: DeckId) -> None:

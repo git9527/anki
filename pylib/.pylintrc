@@ -18,7 +18,10 @@ ignored-classes=
   SetDeckCollapsedRequest,
   ConfigKey,
   HelpPageLinkRequest,
-  StripHtmlRequest
+  StripHtmlRequest,
+  CustomStudyRequest,
+  Cram,
+  ScheduleCardsAsNewRequest,
 
 [REPORTS]
 output-format=colorized

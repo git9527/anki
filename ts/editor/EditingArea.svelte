@@ -4,14 +4,22 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 -->
 <script context="module" lang="ts">
     import type { Writable } from "svelte/store";
+
     import contextProperty from "../sveltelib/context-property";
 
     export interface EditingInputAPI {
         readonly name: string;
-        focus(): void;
-        refocus(): void;
         focusable: boolean;
-        moveCaretToEnd(): void;
+        /**
+         * The reaction to a user-initiated focus, e.g. by clicking on the
+         * editor label, or pressing Tab.
+         */
+        focus(): void;
+        /**
+         * Behaves similar to a refresh, e.g. sync with content, put the caret
+         * into a neutral position, and/or clear selections.
+         */
+        refocus(): void;
     }
 
     export interface EditingAreaAPI {
@@ -22,15 +30,17 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     }
 
     const key = Symbol("editingArea");
-    const [set, getEditingArea, hasEditingArea] = contextProperty<EditingAreaAPI>(key);
+    const [context, setContextProperty] = contextProperty<EditingAreaAPI>(key);
 
-    export { getEditingArea, hasEditingArea };
+    export { context };
 </script>
 
 <script lang="ts">
+    import { setContext as svelteSetContext } from "svelte";
     import { writable } from "svelte/store";
-    import { onMount, setContext as svelteSetContext } from "svelte";
+
     import { fontFamilyKey, fontSizeKey } from "../lib/context-keys";
+    import FocusTrap from "./FocusTrap.svelte";
 
     export let fontFamily: string;
     const fontFamilyStore = writable(fontFamily);
@@ -43,10 +53,9 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     svelteSetContext(fontSizeKey, fontSizeStore);
 
     export let content: Writable<string>;
-    export let autofocus = false;
 
     let editingArea: HTMLElement;
-    let focusTrap: HTMLInputElement;
+    let focusTrap: FocusTrap;
 
     const inputsStore = writable<EditingInputAPI[]>([]);
     $: editingInputs = $inputsStore;
@@ -67,13 +76,18 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
     }
 
     function focusEditingInputIfFocusTrapFocused(): void {
-        if (document.activeElement === focusTrap) {
+        if (focusTrap && focusTrap.isFocusTrap(document.activeElement!)) {
             focusEditingInputIfAvailable();
         }
     }
 
     $: {
         $inputsStore;
+        /**
+         * Triggers when all editing inputs are hidden,
+         * the editor field has focus, and then some
+         * editing input is shown
+         */
         focusEditingInputIfFocusTrapFocused();
     }
 
@@ -111,32 +125,20 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         }
     }
 
-    export let api: Partial<EditingAreaAPI> = {};
+    let apiPartial: Partial<EditingAreaAPI>;
+    export { apiPartial as api };
 
-    Object.assign(
-        api,
-        set({
-            content,
-            editingInputs: inputsStore,
-            focus,
-            refocus,
-        }),
-    );
-
-    onMount(() => {
-        if (autofocus) {
-            focus();
-        }
+    const api = Object.assign(apiPartial, {
+        content,
+        editingInputs: inputsStore,
+        focus,
+        refocus,
     });
+
+    setContextProperty(api);
 </script>
 
-<input
-    bind:this={focusTrap}
-    readonly
-    tabindex="-1"
-    class="focus-trap"
-    on:focus={focusEditingInputInsteadIfAvailable}
-/>
+<FocusTrap bind:this={focusTrap} on:focus={focusEditingInputInsteadIfAvailable} />
 
 <div bind:this={editingArea} class="editing-area" on:focusout={trapFocusOnBlurOut}>
     <slot />
@@ -144,6 +146,10 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
 <style lang="scss">
     .editing-area {
+        display: grid;
+        /* TODO allow configuration of grid #1503 */
+        /* grid-template-columns: repeat(2, 1fr); */
+
         position: relative;
         background: var(--frame-bg);
         border-radius: 0 0 5px 5px;
@@ -151,19 +157,5 @@ License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
         &:focus {
             outline: none;
         }
-    }
-
-    .focus-trap {
-        display: block;
-        width: 0px;
-        height: 0;
-        padding: 0;
-        margin: 0;
-        border: none;
-        outline: none;
-        -webkit-appearance: none;
-        background: none;
-        resize: none;
-        appearance: none;
     }
 </style>

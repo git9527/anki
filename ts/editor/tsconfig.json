@@ -1,6 +1,15 @@
 {
     "extends": "../tsconfig.json",
-    "include": ["*", "image-overlay/*", "mathjax-overlay/*"],
+    "include": [
+        "*",
+        "image-overlay/*",
+        "mathjax-overlay/*",
+        "plain-text-input/*",
+        "rich-text-input/*",
+        "editor-toolbar/*",
+        "tag-editor/*",
+        "tag-editor/tag-options-button/*"
+    ],
     "references": [
         { "path": "../components" },
         { "path": "../domlib" },

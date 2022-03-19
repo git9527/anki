@@ -79,7 +79,7 @@ impl Collection {
         };
         self.transact(Op::UnburyUnsuspend, |col| {
             col.search_cards_into_table(
-                match_all![SearchNode::DeckIdWithChildren(deck_id), state],
+                SearchBuilder::from(SearchNode::DeckIdWithChildren(deck_id)).and(state),
                 SortMode::NoOrder,
             )?;
             col.unsuspend_or_unbury_searched_cards()
@@ -147,9 +147,15 @@ impl Collection {
         nid: NoteId,
         include_new: bool,
         include_reviews: bool,
+        include_day_learn: bool,
     ) -> Result<usize> {
-        self.storage
-            .search_siblings_for_bury(cid, nid, include_new, include_reviews)?;
+        self.storage.search_siblings_for_bury(
+            cid,
+            nid,
+            include_new,
+            include_reviews,
+            include_day_learn,
+        )?;
         self.bury_or_suspend_searched_cards(BuryOrSuspendMode::BurySched)
     }
 }

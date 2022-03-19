@@ -7,6 +7,10 @@ import pprint
 import time
 
 import anki  # pylint: disable=unused-import
+import anki.collection
+import anki.decks
+import anki.notes
+import anki.template
 from anki import cards_pb2, hooks
 from anki._legacy import DeprecatedNamesMixin, deprecated
 from anki.consts import *
@@ -85,7 +89,9 @@ class Card(DeprecatedNamesMixin):
         self.odue = card.original_due
         self.odid = anki.decks.DeckId(card.original_deck_id)
         self.flags = card.flags
-        self.data = card.data
+        self.original_position = (
+            card.original_position if card.HasField("original_position") else None
+        )
 
     def _to_backend_card(self) -> cards_pb2.Card:
         # mtime & usn are set by backend
@@ -105,7 +111,9 @@ class Card(DeprecatedNamesMixin):
             original_due=self.odue,
             original_deck_id=self.odid,
             flags=self.flags,
-            data=self.data,
+            original_position=self.original_position
+            if self.original_position is not None
+            else None,
         )
 
     def flush(self) -> None:
@@ -193,7 +201,7 @@ class Card(DeprecatedNamesMixin):
         del dict_copy["_note"]
         del dict_copy["_render_output"]
         del dict_copy["col"]
-        del dict_copy["timerStarted"]
+        del dict_copy["timer_started"]
         return f"{super().__repr__()} {pprint.pformat(dict_copy, width=300)}"
 
     def user_flag(self) -> int:

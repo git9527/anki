@@ -57,7 +57,7 @@ cargo_build_script(
     version = "0.4.4",
     visibility = ["//visibility:private"],
     deps = [
-        "@raze__autocfg__1_0_1//:autocfg",
+        "@raze__autocfg__1_1_0//:autocfg",
     ],
 )
 
@@ -74,8 +74,8 @@ rust_library(
     ],
     tags = [
         "cargo-raze",
+        "crate-name=miniz_oxide",
         "manual",
-        "crate-name=miniz_oxide"
     ],
     version = "0.4.4",
     # buildifier: leave-alone

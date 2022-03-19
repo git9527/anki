@@ -1,12 +1,12 @@
 __pycache__
 .DS_Store
-/bazel-*
 anki.prof
 target
-user.bazelrc
+/user.bazelrc
 .dmypy.json
-rust-project.json
 node_modules
+/.idea/
+/.bazel
+/windows.bazelrc
 venv
-.idea
 .python-version

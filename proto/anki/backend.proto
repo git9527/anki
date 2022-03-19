@@ -25,6 +25,7 @@ enum ServiceIndex {
   SERVICE_INDEX_COLLECTION = 13;
   SERVICE_INDEX_CARDS = 14;
   SERVICE_INDEX_LINKS = 15;
+  SERVICE_INDEX_IMPORT_EXPORT = 16;
 }
 
 message BackendInit {
@@ -55,6 +56,8 @@ message BackendError {
     EXISTS = 12;
     FILTERED_DECK_ERROR = 13;
     SEARCH_ERROR = 14;
+    CUSTOM_STUDY_ERROR = 15;
+    IMPORT_ERROR = 16;
   }
 
   // localized error description suitable for displaying to the user

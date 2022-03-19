@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING, Any, Iterable, NewType, Sequence, no_type_chec
 if TYPE_CHECKING:
     import anki
 
+import anki.cards
+import anki.collection
 from anki import deckconfig_pb2, decks_pb2
 from anki._legacy import DeprecatedNamesMixin, deprecated, print_deprecation_warning
-from anki.cards import CardId
 from anki.collection import OpChanges, OpChangesWithCount, OpChangesWithId
 from anki.consts import *
 from anki.errors import NotFoundError
@@ -173,7 +174,7 @@ class DeckManager(DeprecatedNamesMixin):
         return deck
 
     def deck_tree(self) -> DeckTreeNode:
-        return self.col._backend.deck_tree(top_deck_id=0, now=0)
+        return self.col._backend.deck_tree(now=0)
 
     @classmethod
     def find_deck_in_tree(
@@ -285,7 +286,8 @@ class DeckManager(DeprecatedNamesMixin):
         return self.col._backend.get_deck_configs_for_update(deck_id)
 
     def update_deck_configs(self, input: UpdateDeckConfigs) -> OpChanges:
-        return self.col._backend.update_deck_configs(input=input)
+        op_bytes = self.col._backend.update_deck_configs_raw(input.SerializeToString())
+        return OpChanges.FromString(op_bytes)
 
     def all_config(self) -> list[DeckConfigDict]:
         "A list of all deck config."
@@ -382,7 +384,7 @@ class DeckManager(DeprecatedNamesMixin):
             return deck["name"]
         return None
 
-    def cids(self, did: DeckId, children: bool = False) -> list[CardId]:
+    def cids(self, did: DeckId, children: bool = False) -> list[anki.cards.CardId]:
         if not children:
             return self.col.db.list("select id from cards where did=?", did)
         dids = [did]
@@ -390,7 +392,7 @@ class DeckManager(DeprecatedNamesMixin):
             dids.append(id)
         return self.col.db.list(f"select id from cards where did in {ids2str(dids)}")
 
-    def for_card_ids(self, cids: list[CardId]) -> list[DeckId]:
+    def for_card_ids(self, cids: list[anki.cards.CardId]) -> list[DeckId]:
         return self.col.db.list(f"select did from cards where id in {ids2str(cids)}")
 
     # Deck selection
@@ -542,7 +544,7 @@ class DeckManager(DeprecatedNamesMixin):
         return {d["name"]: d for d in self.all()}
 
     @deprecated(info="use col.set_deck() instead")
-    def set_deck(self, cids: list[CardId], did: DeckId) -> None:
+    def set_deck(self, cids: list[anki.cards.CardId], did: DeckId) -> None:
         self.col.set_deck(card_ids=cids, deck_id=did)
         self.col.db.execute(
             f"update cards set did=?,usn=?,mod=? where id in {ids2str(cids)}",

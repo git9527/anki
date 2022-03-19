@@ -1,14 +1,10 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+import { getSelection } from "../../lib/cross-browser";
+import { findNodeFromCoordinates } from "./node";
 import type { SelectionLocation, SelectionLocationContent } from "./selection";
 import { getSelectionLocation } from "./selection";
-import { findNodeFromCoordinates } from "./node";
-import { getSelection } from "../../lib/cross-browser";
-
-export function saveSelection(base: Node): SelectionLocation | null {
-    return getSelectionLocation(base);
-}
 
 function unselect(selection: Selection): void {
     selection.empty();
@@ -31,6 +27,10 @@ function setSelectionToLocationContent(
         selection.addRange(range);
         selection.extend(focusNode!, focusOffset!);
     }
+}
+
+export function saveSelection(base: Node): SelectionLocation | null {
+    return getSelectionLocation(base);
 }
 
 export function restoreSelection(base: Node, location: SelectionLocation): void {

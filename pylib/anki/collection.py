@@ -235,7 +235,13 @@ class Collection(DeprecatedNamesMixin):
         elif time.time() - self._last_checkpoint_at > 300:
             self.save()
 
-    def close(self, save: bool = True, downgrade: bool = False) -> None:
+    def close(
+        self,
+        save: bool = True,
+        downgrade: bool = False,
+        backup_folder: str | None = None,
+        minimum_backup_interval: int | None = None,
+    ) -> None:
         "Disconnect from DB."
         if self.db:
             if save:
@@ -243,9 +249,13 @@ class Collection(DeprecatedNamesMixin):
             else:
                 self.db.rollback()
             self._clear_caches()
-            self._backend.close_collection(downgrade_to_schema11=downgrade)
+            request = collection_pb2.CloseCollectionRequest(
+                downgrade_to_schema11=downgrade,
+                backup_folder=backup_folder,
+                minimum_backup_interval=minimum_backup_interval,
+            )
+            self._backend.close_collection(request)
             self.db = None
-            self.media.close()
 
     def close_for_full_sync(self) -> None:
         # save and cleanup, but backend will take care of collection close
@@ -253,7 +263,14 @@ class Collection(DeprecatedNamesMixin):
             self.save(trx=False)
             self._clear_caches()
             self.db = None
-            self.media.close()
+
+    def export_collection(
+        self, out_path: str, include_media: bool, legacy: bool
+    ) -> None:
+        self.close_for_full_sync()
+        self._backend.export_collection_package(
+            out_path=out_path, include_media=include_media, legacy=legacy
+        )
 
     def rollback(self) -> None:
         self._clear_caches()
@@ -285,8 +302,6 @@ class Collection(DeprecatedNamesMixin):
                 media_db_path=media_db,
                 log_path=log_path,
             )
-        else:
-            self.media.connect()
         self.db = DBProxy(weakref.proxy(self._backend))
         self.db.begin()
 
@@ -804,24 +819,11 @@ class Collection(DeprecatedNamesMixin):
 
         return CollectionStats(self)
 
-    def card_stats_data(self, card_id: CardId) -> bytes:
+    def card_stats_data(self, card_id: CardId) -> stats_pb2.CardStatsResponse:
         return self._backend.card_stats(card_id)
 
     def studied_today(self) -> str:
         return self._backend.studied_today()
-
-    def graph_data(self, search: str, days: int) -> bytes:
-        return self._backend.graphs(search=search, days=days)
-
-    def get_graph_preferences(self) -> bytes:
-        return self._backend.get_graph_preferences()
-
-    def set_graph_preferences(self, prefs: GraphPreferences) -> None:
-        self._backend.set_graph_preferences(input=prefs)
-
-    def congrats_info(self) -> bytes:
-        "Don't use this, it will likely go away in the future."
-        return self._backend.congrats_info().SerializeToString()
 
     # Undo
     ##########################################################################

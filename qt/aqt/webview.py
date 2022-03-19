@@ -8,12 +8,13 @@ import sys
 from typing import Any, Callable, Optional, Sequence, cast
 
 import anki
+import anki.lang
 from anki.lang import is_rtl
 from anki.utils import is_lin, is_mac, is_win
 from aqt import colors, gui_hooks
 from aqt.qt import *
 from aqt.theme import theme_manager
-from aqt.utils import askUser, openLink, showInfo, tr
+from aqt.utils import askUser, is_gesture_or_zoom_event, openLink, showInfo, tr
 
 serverbaseurl = re.compile(r"^.+:\/\/[^\/]+")
 
@@ -241,6 +242,7 @@ class AnkiWebView(QWebEngineView):
         self._pendingActions: list[tuple[str, Sequence[Any]]] = []
         self.requiresCol = True
         self.setPage(self._page)
+        self._disable_zoom = False
 
         self.resetHandlers()
         self._filterSet = False
@@ -255,18 +257,26 @@ class AnkiWebView(QWebEngineView):
     def set_title(self, title: str) -> None:
         self.title = title  # type: ignore[assignment]
 
+    def disable_zoom(self) -> None:
+        self._disable_zoom = True
+
+    def createWindow(self, windowType: QWebEnginePage.WebWindowType) -> QWebEngineView:
+        # intercept opening a new window (hrefs
+        # with target="_blank") and return view
+        return AnkiWebView()
+
     def eventFilter(self, obj: QObject, evt: QEvent) -> bool:
-        # disable pinch to zoom gesture
-        if isinstance(evt, QNativeGestureEvent):
+        if self._disable_zoom and is_gesture_or_zoom_event(evt):
             return True
-        elif (
+
+        if (
             isinstance(evt, QMouseEvent)
             and evt.type() == QEvent.Type.MouseButtonRelease
         ):
             if evt.button() == Qt.MouseButton.MiddleButton and is_lin:
                 self.onMiddleClickPaste()
                 return True
-            return False
+
         return False
 
     def set_open_links_externally(self, enable: bool) -> None:
@@ -348,7 +358,7 @@ class AnkiWebView(QWebEngineView):
         self._domDone = False
         super().load(url)
 
-    def zoomFactor(self) -> float:
+    def app_zoom_factor(self) -> float:
         # overridden scale factor?
         webscale = os.environ.get("ANKI_WEBSCALE")
         if webscale:
@@ -404,8 +414,9 @@ class AnkiWebView(QWebEngineView):
         if is_win:
             # T: include a font for your language on Windows, eg: "Segoe UI", "MS Mincho"
             family = tr.qt_misc_segoe_ui()
-            button_style = "button { font-family:%s; }" % family
-            button_style += "\n:focus { outline: 1px solid %s; }" % color_hl
+            button_style = f"""
+button {{ font-family: {family}; }}
+button:focus {{ outline: 5px auto {color_hl}; }}"""
             font = f"font-size:12px;font-family:{family};"
         elif is_mac:
             family = "Helvetica"
@@ -417,12 +428,12 @@ border-radius:5px; font-family: Helvetica }"""
             family = self.font().family()
             color_hl_txt = palette.color(QPalette.ColorRole.HighlightedText).name()
             color_btn = palette.color(QPalette.ColorRole.Button).name()
-            font = f'font-size:14px;font-family:"{family}";'
+            font = f'font-size:14px;font-family:"{family}", sans-serif;'
             button_style = """
 /* Buttons */
 button{{ 
         background-color: {color_btn};
-        font-family:"{family}"; }}
+        font-family:"{family}", sans-serif; }}
 button:focus{{ border-color: {color_hl} }}
 button:active, button:active:hover {{ background-color: {color_hl}; color: {color_hl_txt};}}
 /* Input field focus outline */
@@ -437,7 +448,7 @@ div[contenteditable="true"]:focus {{
                 color_hl_txt=color_hl_txt,
             )
 
-        zoom = self.zoomFactor()
+        zoom = self.app_zoom_factor()
 
         window_bg_day = self.get_window_bg_color(False).name()
         window_bg_night = self.get_window_bg_color(True).name()
@@ -617,7 +628,7 @@ html {{ {font} }}
 
         if qvar is None:
 
-            mw.progress.timer(1000, mw.reset, False)
+            mw.progress.single_shot(1000, mw.reset)
             return
 
         self.setFixedHeight(int(qvar))
@@ -647,9 +658,11 @@ html {{ {font} }}
 
         self.evalWithCallback(
             f"""
-const style = document.createElement('style');
-style.innerHTML = `{css}`;
-document.head.appendChild(style);
+(function(){{
+    const style = document.createElement('style');
+    style.innerHTML = `{css}`;
+    document.head.appendChild(style);
+}})();
 """,
             after_style,
         )

@@ -13,6 +13,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import warnings
+from enum import Enum
 from random import randrange
 from typing import Any, Callable, Match, cast
 
@@ -21,6 +22,8 @@ import requests
 from bs4 import BeautifulSoup
 
 import aqt
+import aqt.forms
+import aqt.operations
 import aqt.sound
 from anki._legacy import deprecated
 from anki.cards import Card
@@ -80,6 +83,12 @@ audio = (
 )
 
 
+class EditorMode(Enum):
+    ADD_CARDS = 0
+    EDIT_CURRENT = 1
+    BROWSER = 2
+
+
 class Editor:
     """The screen that embeds an editing widget should listen for changes via
     the `operation_did_execute` hook, and call set_note() when the editor needs
@@ -91,19 +100,30 @@ class Editor:
     """
 
     def __init__(
-        self, mw: AnkiQt, widget: QWidget, parentWindow: QWidget, addMode: bool = False
+        self,
+        mw: AnkiQt,
+        widget: QWidget,
+        parentWindow: QWidget,
+        addMode: bool | None = None,
+        *,
+        editor_mode: EditorMode = EditorMode.EDIT_CURRENT,
     ) -> None:
         self.mw = mw
         self.widget = widget
         self.parentWindow = parentWindow
         self.note: Note | None = None
-        self.addMode = addMode
+        # legacy argument provided?
+        if addMode is not None:
+            editor_mode = EditorMode.ADD_CARDS if addMode else EditorMode.EDIT_CURRENT
+        self.addMode = editor_mode is EditorMode.ADD_CARDS
+        self.editorMode = editor_mode
         self.currentField: int | None = None
         # Similar to currentField, but not set to None on a blur. May be
         # outside the bounds of the current notetype.
         self.last_field_index: int | None = None
         # current card, for card layout
         self.card: Card | None = None
+        self._init_links()
         self.setupOuter()
         self.setupWeb()
         self.setupShortcuts()
@@ -124,11 +144,18 @@ class Editor:
         self.web.set_bridge_command(self.onBridgeCmd, self)
         self.outerLayout.addWidget(self.web, 1)
 
+        if self.editorMode == EditorMode.ADD_CARDS:
+            file = "note_creator"
+        elif self.editorMode == EditorMode.BROWSER:
+            file = "browser_editor"
+        else:
+            file = "reviewer_editor"
+
         # then load page
         self.web.stdHtml(
             "",
-            css=["css/editor.css"],
-            js=["js/editor.js"],
+            css=[f"css/{file}.css"],
+            js=[f"js/{file}.js"],
             context=self,
             default_css=False,
         )
@@ -137,7 +164,7 @@ class Editor:
         gui_hooks.editor_did_init_left_buttons(lefttopbtns, self)
 
         lefttopbtns_defs = [
-            f"noteEditorPromise.then((noteEditor) => noteEditor.toolbar.notetypeButtons.appendButton({{ component: editorToolbar.Raw, props: {{ html: {json.dumps(button)} }} }}, -1));"
+            f"uiPromise.then((noteEditor) => noteEditor.toolbar.notetypeButtons.appendButton({{ component: editorToolbar.Raw, props: {{ html: {json.dumps(button)} }} }}, -1));"
             for button in lefttopbtns
         ]
         lefttopbtns_js = "\n".join(lefttopbtns_defs)
@@ -150,7 +177,7 @@ class Editor:
         righttopbtns_defs = ", ".join([json.dumps(button) for button in righttopbtns])
         righttopbtns_js = (
             f"""
-noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
+require("anki/ui").loaded.then(() => require("anki/NoteEditor").instances[0].toolbar.toolbar.append({{
     component: editorToolbar.AddonButtons,
     id: "addons",
     props: {{ buttons: [ {righttopbtns_defs} ] }},
@@ -368,7 +395,9 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
                 if gui_hooks.editor_did_unfocus_field(False, self.note, ord):
                     # something updated the note; update it after a subsequent focus
                     # event has had time to fire
-                    self.mw.progress.timer(100, self.loadNoteKeepingFocus, False)
+                    self.mw.progress.timer(
+                        100, self.loadNoteKeepingFocus, False, parent=self.widget
+                    )
                 else:
                     self._check_and_update_duplicate_display_async()
             else:
@@ -431,7 +460,7 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
                 self._save_current_note()
 
         elif cmd in self._links:
-            self._links[cmd](self)
+            return self._links[cmd](self)
 
         else:
             print("uncaught cmd", cmd)
@@ -502,7 +531,7 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
 
         js = gui_hooks.editor_will_load_note(js, self.note, self)
         self.web.evalWithCallback(
-            f"noteEditorPromise.then(() => {{ {js} }})", oncallback
+            f'require("anki/ui").loaded.then(() => {{ {js} }})', oncallback
         )
 
     def _save_current_note(self) -> None:
@@ -523,7 +552,7 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
         "Save unsaved edits then call callback()."
         if not self.note:
             # calling code may not expect the callback to fire immediately
-            self.mw.progress.timer(10, callback, False)
+            self.mw.progress.single_shot(10, callback)
             return
         self.web.evalWithCallback("saveNow(%d)" % keepFocus, lambda res: callback())
 
@@ -557,8 +586,12 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
         elif result == NoteFieldsCheckResult.FIELD_NOT_CLOZE:
             cloze_hint = tr.adding_cloze_outside_cloze_field()
 
-        self.web.eval(f"setBackgrounds({json.dumps(cols)});")
-        self.web.eval(f"setClozeHint({json.dumps(cloze_hint)});")
+        self.web.eval(
+            'require("anki/ui").loaded.then(() => {'
+            f"setBackgrounds({json.dumps(cols)});\n"
+            f"setClozeHint({json.dumps(cloze_hint)});\n"
+            "}); "
+        )
 
     def showDupes(self) -> None:
         aqt.dialogs.open(
@@ -655,13 +688,15 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
     ######################################################################
 
     def onAddMedia(self) -> None:
+        """Show a file selection screen, then add the selected media.
+        This expects initial setup to have been done by TemplateButtons.svelte."""
         extension_filter = " ".join(
             f"*.{extension}" for extension in sorted(itertools.chain(pics, audio))
         )
         filter = f"{tr.editing_media()} ({extension_filter})"
 
         def accept(file: str) -> None:
-            self.addMedia(file)
+            self.resolve_media(file)
 
         file = getFile(
             parent=self.widget,
@@ -670,16 +705,33 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
             filter=filter,
             key="media",
         )
+
         self.parentWindow.activateWindow()
 
     def addMedia(self, path: str, canDelete: bool = False) -> None:
-        """canDelete is a legacy arg and is ignored."""
+        """Legacy routine used by add-ons to add a media file and update the current field.
+        canDelete is ignored."""
+
         try:
             html = self._addMedia(path)
         except Exception as e:
             showWarning(str(e))
             return
+
         self.web.eval(f"setFormat('inserthtml', {json.dumps(html)});")
+
+    def resolve_media(self, path: str) -> None:
+        """Finish inserting media into a field.
+        This expects initial setup to have been done by TemplateButtons.svelte."""
+        try:
+            html = self._addMedia(path)
+        except Exception as e:
+            showWarning(str(e))
+            return
+
+        self.web.eval(
+            f'require("anki/TemplateButtons").resolveMedia({json.dumps(html)})'
+        )
 
     def _addMedia(self, path: str, canDelete: bool = False) -> str:
         """Add to media folder and return local img or sound tag."""
@@ -696,7 +748,7 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
             self.parentWindow,
             self.mw,
             True,
-            lambda file: self.addMedia(file, canDelete=True),
+            self.resolve_media,
         )
 
     # Media downloads
@@ -1074,29 +1126,30 @@ noteEditorPromise.then(noteEditor => noteEditor.toolbar.toolbar.appendGroup({{
     # Links from HTML
     ######################################################################
 
-    _links: dict[str, Callable] = dict(
-        fields=onFields,
-        cards=onCardLayout,
-        bold=toggleBold,
-        italic=toggleItalic,
-        underline=toggleUnderline,
-        super=toggleSuper,
-        sub=toggleSub,
-        clear=removeFormat,
-        colour=onForeground,
-        changeCol=onChangeCol,
-        cloze=onCloze,
-        attach=onAddMedia,
-        record=onRecSound,
-        more=onAdvanced,
-        dupes=showDupes,
-        paste=onPaste,
-        cutOrCopy=onCutOrCopy,
-        htmlEdit=onHtmlEdit,
-        mathjaxInline=insertMathjaxInline,
-        mathjaxBlock=insertMathjaxBlock,
-        mathjaxChemistry=insertMathjaxChemistry,
-    )
+    def _init_links(self) -> None:
+        self._links: dict[str, Callable] = dict(
+            fields=Editor.onFields,
+            cards=Editor.onCardLayout,
+            bold=Editor.toggleBold,
+            italic=Editor.toggleItalic,
+            underline=Editor.toggleUnderline,
+            super=Editor.toggleSuper,
+            sub=Editor.toggleSub,
+            clear=Editor.removeFormat,
+            colour=Editor.onForeground,
+            changeCol=Editor.onChangeCol,
+            cloze=Editor.onCloze,
+            attach=Editor.onAddMedia,
+            record=Editor.onRecSound,
+            more=Editor.onAdvanced,
+            dupes=Editor.showDupes,
+            paste=Editor.onPaste,
+            cutOrCopy=Editor.onCutOrCopy,
+            htmlEdit=Editor.onHtmlEdit,
+            mathjaxInline=Editor.insertMathjaxInline,
+            mathjaxBlock=Editor.insertMathjaxBlock,
+            mathjaxChemistry=Editor.insertMathjaxChemistry,
+        )
 
 
 # Pasting, drag & drop, and keyboard layouts
@@ -1331,14 +1384,12 @@ gui_hooks.editor_will_munge_html.append(reverse_url_quoting)
 
 
 def set_cloze_button(editor: Editor) -> None:
-    if editor.note.note_type()["type"] == MODEL_CLOZE:
-        editor.web.eval(
-            'noteEditorPromise.then((noteEditor) => noteEditor.toolbar.templateButtons.showButton("cloze")); '
-        )
-    else:
-        editor.web.eval(
-            'noteEditorPromise.then((noteEditor) => noteEditor.toolbar.templateButtons.hideButton("cloze")); '
-        )
+    action = "show" if editor.note.note_type()["type"] == MODEL_CLOZE else "hide"
+    editor.web.eval(
+        'require("anki/ui").loaded.then(() =>'
+        f'require("anki/NoteEditor").instances[0].toolbar.templateButtons.{action}("cloze")'
+        "); "
+    )
 
 
 gui_hooks.editor_did_load_note.append(set_cloze_button)

@@ -7,7 +7,10 @@ import json
 from typing import Callable, Sequence
 
 import aqt
+import aqt.browser
+import aqt.editor
 import aqt.forms
+import aqt.operations
 from anki._legacy import deprecated
 from anki.cards import Card, CardId
 from anki.collection import Collection, Config, OpChanges, SearchNode
@@ -15,6 +18,7 @@ from anki.consts import *
 from anki.errors import NotFoundError
 from anki.lang import without_unicode_isolation
 from anki.notes import NoteId
+from anki.scheduler.base import ScheduleCardsAsNew
 from anki.tags import MARKED_TAG
 from anki.utils import is_mac
 from aqt import AnkiQt, gui_hooks
@@ -133,9 +137,9 @@ class Browser(QMainWindow):
         self.on_undo_state_change(mw.undo_actions_info())
         # legacy alias
         self.model = MockModel(self)
+        self.setupSearch(card, search)
         gui_hooks.browser_will_show(self)
         self.show()
-        self.setupSearch(card, search)
 
     def on_operation_did_execute(
         self, changes: OpChanges, handler: object | None
@@ -175,6 +179,7 @@ class Browser(QMainWindow):
     def setupMenus(self) -> None:
         # actions
         f = self.form
+
         # edit
         qconnect(f.actionUndo.triggered, self.undo)
         qconnect(f.actionRedo.triggered, self.redo)
@@ -184,6 +189,22 @@ class Browser(QMainWindow):
             f.actionClose.setVisible(False)
         qconnect(f.actionCreateFilteredDeck.triggered, self.createFilteredDeck)
         f.actionCreateFilteredDeck.setShortcuts(["Ctrl+G", "Ctrl+Alt+G"])
+
+        # view
+        qconnect(f.actionFullScreen.triggered, self.mw.on_toggle_full_screen)
+        qconnect(
+            f.actionZoomIn.triggered,
+            lambda: self.editor.web.setZoomFactor(self.editor.web.zoomFactor() + 0.1),
+        )
+        qconnect(
+            f.actionZoomOut.triggered,
+            lambda: self.editor.web.setZoomFactor(self.editor.web.zoomFactor() - 0.1),
+        )
+        qconnect(
+            f.actionResetZoom.triggered,
+            lambda: self.editor.web.setZoomFactor(1),
+        )
+
         # notes
         qconnect(f.actionAdd.triggered, self.mw.onAddCard)
         qconnect(f.actionCopy.triggered, self.on_create_copy)
@@ -196,6 +217,7 @@ class Browser(QMainWindow):
         qconnect(f.actionFindReplace.triggered, self.onFindReplace)
         qconnect(f.actionManage_Note_Types.triggered, self.mw.onNoteTypes)
         qconnect(f.actionDelete.triggered, self.delete_selected_notes)
+
         # cards
         qconnect(f.actionChange_Deck.triggered, self.set_deck_of_selected_cards)
         qconnect(f.action_Info.triggered, self.showCardInfo)
@@ -213,6 +235,7 @@ class Browser(QMainWindow):
             )
         self._update_flag_labels()
         qconnect(f.actionExport.triggered, self._on_export_notes)
+
         # jumps
         qconnect(f.actionPreviousCard.triggered, self.onPreviousCard)
         qconnect(f.actionNextCard.triggered, self.onNextCard)
@@ -222,13 +245,16 @@ class Browser(QMainWindow):
         qconnect(f.actionNote.triggered, self.onNote)
         qconnect(f.actionSidebar.triggered, self.focusSidebar)
         qconnect(f.actionCardList.triggered, self.onCardList)
+
         # help
         qconnect(f.actionGuide.triggered, self.onHelp)
+
         # keyboard shortcut for shift+home/end
         self.pgUpCut = QShortcut(QKeySequence("Shift+Home"), self)
         qconnect(self.pgUpCut.activated, self.onFirstCard)
         self.pgDownCut = QShortcut(QKeySequence("Shift+End"), self)
         qconnect(self.pgDownCut.activated, self.onLastCard)
+
         # add-on hook
         gui_hooks.browser_menus_did_init(self)
         self.mw.maybeHideAccelerators(self)
@@ -413,12 +439,14 @@ class Browser(QMainWindow):
 
         def add_preview_button(editor: Editor) -> None:
             editor._links["preview"] = lambda _editor: self.onTogglePreview()
-            editor.web.eval(
-                "noteEditorPromise.then(noteEditor => noteEditor.toolbar.notetypeButtons.appendButton({ component: editorToolbar.PreviewButton, id: 'preview' }));",
-            )
 
         gui_hooks.editor_did_init.append(add_preview_button)
-        self.editor = aqt.editor.Editor(self.mw, self.form.fieldsArea, self)
+        self.editor = aqt.editor.Editor(
+            self.mw,
+            self.form.fieldsArea,
+            self,
+            editor_mode=aqt.editor.EditorMode.BROWSER,
+        )
         gui_hooks.editor_did_init.remove(add_preview_button)
 
     @ensure_editor_saved
@@ -533,7 +561,7 @@ class Browser(QMainWindow):
 
         # schedule sidebar to refresh after browser window has loaded, so the
         # UI is more responsive
-        self.mw.progress.timer(10, self.sidebar.refresh, False)
+        self.mw.progress.timer(10, self.sidebar.refresh, False, parent=self.sidebar)
 
     def showSidebar(self) -> None:
         self.sidebarDockWidget.setVisible(True)
@@ -628,9 +656,7 @@ class Browser(QMainWindow):
 
     def toggle_preview_button_state(self, active: bool) -> None:
         if self.editor.web:
-            self.editor.web.eval(
-                f"editorToolbar.togglePreviewButtonState({json.dumps(active)});"
-            )
+            self.editor.web.eval(f"togglePreviewButtonState({json.dumps(active)});")
 
     def _cleanup_preview(self) -> None:
         if self._previewer:
@@ -673,19 +699,22 @@ class Browser(QMainWindow):
         cids = self.table.get_selected_card_ids()
         did = self.mw.col.db.scalar("select did from cards where id = ?", cids[0])
         current = self.mw.col.decks.get(did)["name"]
-        ret = StudyDeck(
+
+        def callback(ret: StudyDeck) -> None:
+            if not ret.name:
+                return
+            did = self.col.decks.id(ret.name)
+            set_card_deck(parent=self, card_ids=cids, deck_id=did).run_in_background()
+
+        StudyDeck(
             self.mw,
             current=current,
             accept=tr.browsing_move_cards(),
             title=tr.browsing_change_deck(),
             help=HelpPage.BROWSING,
             parent=self,
+            callback=callback,
         )
-        if not ret.name:
-            return
-        did = self.col.decks.id(ret.name)
-
-        set_card_deck(parent=self, card_ids=cids, deck_id=did).run_in_background()
 
     # legacy
 
@@ -834,10 +863,12 @@ class Browser(QMainWindow):
     @skip_if_selection_is_empty
     @ensure_editor_saved
     def forget_cards(self) -> None:
-        forget_cards(
+        if op := forget_cards(
             parent=self,
             card_ids=self.selected_cards(),
-        ).run_in_background()
+            context=ScheduleCardsAsNew.Context.BROWSER,
+        ):
+            op.run_in_background()
 
     # Edit: selection
     ######################################################################
@@ -869,7 +900,7 @@ class Browser(QMainWindow):
     def teardownHooks(self) -> None:
         gui_hooks.undo_state_did_change.remove(self.on_undo_state_change)
         gui_hooks.backend_will_block.remove(self.table.on_backend_will_block)
-        gui_hooks.backend_did_block.remove(self.table.on_backend_will_block)
+        gui_hooks.backend_did_block.remove(self.table.on_backend_did_block)
         gui_hooks.operation_did_execute.remove(self.on_operation_did_execute)
         gui_hooks.focus_did_change.remove(self.on_focus_change)
         gui_hooks.flag_label_did_change.remove(self._update_flag_labels)

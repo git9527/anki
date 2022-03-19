@@ -5,6 +5,8 @@ from typing import Any, cast
 
 import anki.lang
 import aqt
+import aqt.forms
+import aqt.operations
 from anki.collection import OpChanges
 from anki.consts import new_card_scheduling_labels
 from aqt import AnkiQt
@@ -91,8 +93,16 @@ class Preferences(QDialog):
             0 if editing.adding_defaults_to_current_deck else 1
         )
         form.paste_strips_formatting.setChecked(editing.paste_strips_formatting)
+        form.ignore_accents_in_search.setChecked(editing.ignore_accents_in_search)
         form.pastePNG.setChecked(editing.paste_images_as_png)
         form.default_search_text.setText(editing.default_search_text)
+
+        form.backup_explanation.setText(
+            anki.lang.with_collapsed_whitespace(tr.preferences_backup_explanation())
+        )
+        form.daily_backups.setValue(self.prefs.backups.daily)
+        form.weekly_backups.setValue(self.prefs.backups.weekly)
+        form.monthly_backups.setValue(self.prefs.backups.monthly)
 
     def update_collection(self, on_done: Callable[[], None]) -> None:
         form = self.form
@@ -116,6 +126,13 @@ class Preferences(QDialog):
         editing.paste_images_as_png = self.form.pastePNG.isChecked()
         editing.paste_strips_formatting = self.form.paste_strips_formatting.isChecked()
         editing.default_search_text = self.form.default_search_text.text()
+        editing.ignore_accents_in_search = (
+            self.form.ignore_accents_in_search.isChecked()
+        )
+
+        self.prefs.backups.daily = form.daily_backups.value()
+        self.prefs.backups.weekly = form.weekly_backups.value()
+        self.prefs.backups.monthly = form.monthly_backups.value()
 
         def after_prefs_update(changes: OpChanges) -> None:
             self.mw.apply_collection_options()
@@ -136,11 +153,9 @@ class Preferences(QDialog):
     def setup_profile(self) -> None:
         "Setup options stored in the user profile."
         self.setup_network()
-        self.setup_backup()
 
     def update_profile(self) -> None:
         self.update_network()
-        self.update_backup()
 
     # Profile: network
     ######################################################################
@@ -184,15 +199,6 @@ class Preferences(QDialog):
         )
         if self.form.fullSync.isChecked():
             self.mw.col.mod_schema(check=False)
-
-    # Profile: backup
-    ######################################################################
-
-    def setup_backup(self) -> None:
-        self.form.numBackups.setValue(self.prof["numBackups"])
-
-    def update_backup(self) -> None:
-        self.prof["numBackups"] = self.form.numBackups.value()
 
     # Global preferences
     ######################################################################

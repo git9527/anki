@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import anki
+import anki.collection
 from anki import decks_pb2, scheduler_pb2
 from anki._legacy import DeprecatedNamesMixin
 from anki.collection import OpChanges, OpChangesWithCount, OpChangesWithId
@@ -13,6 +14,10 @@ SchedTimingToday = scheduler_pb2.SchedTimingTodayResponse
 CongratsInfo = scheduler_pb2.CongratsInfoResponse
 UnburyDeck = scheduler_pb2.UnburyDeckRequest
 BuryOrSuspend = scheduler_pb2.BuryOrSuspendCardsRequest
+CustomStudyRequest = scheduler_pb2.CustomStudyRequest
+CustomStudyDefaults = scheduler_pb2.CustomStudyDefaultsResponse
+ScheduleCardsAsNew = scheduler_pb2.ScheduleCardsAsNewRequest
+ScheduleCardsAsNewDefaults = scheduler_pb2.ScheduleCardsAsNewDefaultsResponse
 FilteredDeckForUpdate = decks_pb2.FilteredDeckForUpdate
 
 
@@ -20,7 +25,7 @@ from typing import Sequence
 
 from anki import config_pb2
 from anki.cards import CardId
-from anki.consts import CARD_TYPE_NEW, NEW_CARDS_RANDOM, QUEUE_TYPE_NEW, QUEUE_TYPE_REV
+from anki.consts import CARD_TYPE_NEW, NEW_CARDS_RANDOM, QUEUE_TYPE_NEW
 from anki.decks import DeckConfigDict, DeckId, DeckTreeNode
 from anki.notes import NoteId
 from anki.utils import ids2str, int_time
@@ -47,10 +52,13 @@ class SchedulerBase(DeprecatedNamesMixin):
     # Deck list
     ##########################################################################
 
-    def deck_due_tree(self, top_deck_id: int = 0) -> DeckTreeNode:
+    def deck_due_tree(self, top_deck_id: DeckId | None = None) -> DeckTreeNode | None:
         """Returns a tree of decks with counts.
-        If top_deck_id provided, counts are limited to that node."""
-        return self.col._backend.deck_tree(top_deck_id=top_deck_id, now=int_time())
+        If top_deck_id provided, only the according subtree is returned."""
+        tree = self.col._backend.deck_tree(now=int_time())
+        if top_deck_id:
+            return self.col.decks.find_deck_in_tree(tree, top_deck_id)
+        return tree
 
     # Deck finished state & custom study
     ##########################################################################
@@ -68,20 +76,15 @@ class SchedulerBase(DeprecatedNamesMixin):
         info = self.congratulations_info()
         return info.have_sched_buried or info.have_user_buried
 
+    def custom_study(self, request: CustomStudyRequest) -> OpChanges:
+        return self.col._backend.custom_study(request)
+
+    def custom_study_defaults(self, deck_id: DeckId) -> CustomStudyDefaults:
+        return self.col._backend.custom_study_defaults(deck_id=deck_id)
+
     def extend_limits(self, new: int, rev: int) -> None:
         did = self.col.decks.current()["id"]
         self.col._backend.extend_limits(deck_id=did, new_delta=new, review_delta=rev)
-
-    # fixme: used by custom study
-    def total_rev_for_current_deck(self) -> int:
-        assert self.col.db
-        return self.col.db.scalar(
-            f"""
-select count() from cards where id in (
-select id from cards where did in %s and queue = {QUEUE_TYPE_REV} and due <= ? limit 9999)"""
-            % self._deck_limit(),
-            self.today,
-        )
 
     # fixme: only used by total_rev_for_current_deck and old deck stats;
     # schedv2 defines separate version
@@ -155,9 +158,28 @@ select id from cards where did in %s and queue = {QUEUE_TYPE_REV} and due <= ? l
     # Resetting/rescheduling
     ##########################################################################
 
-    def schedule_cards_as_new(self, card_ids: Sequence[CardId]) -> OpChanges:
-        "Put cards at the end of the new queue."
-        return self.col._backend.schedule_cards_as_new(card_ids=card_ids, log=True)
+    def schedule_cards_as_new(
+        self,
+        card_ids: Sequence[CardId],
+        *,
+        restore_position: bool = False,
+        reset_counts: bool = False,
+        context: ScheduleCardsAsNew.Context.V | None = None,
+    ) -> OpChanges:
+        "Place cards back into the new queue."
+        request = ScheduleCardsAsNew(
+            card_ids=card_ids,
+            log=True,
+            restore_position=restore_position,
+            reset_counts=reset_counts,
+            context=context,
+        )
+        return self.col._backend.schedule_cards_as_new(request)
+
+    def schedule_cards_as_new_defaults(
+        self, context: ScheduleCardsAsNew.Context.V
+    ) -> ScheduleCardsAsNewDefaults:
+        return self.col._backend.schedule_cards_as_new_defaults(context)
 
     def set_due_date(
         self,
@@ -195,7 +217,8 @@ select id from cards where did in %s and queue = {QUEUE_TYPE_REV} and due <= ? l
             " where id in %s" % sids
         )
         # and forget any non-new cards, changing their due numbers
-        self.col._backend.schedule_cards_as_new(card_ids=non_new, log=False)
+        request = ScheduleCardsAsNew(card_ids=non_new, log=False, restore_position=True)
+        self.col._backend.schedule_cards_as_new(request)
 
     # Repositioning new cards
     ##########################################################################

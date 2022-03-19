@@ -1,6 +1,7 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+pub mod backup;
 pub(crate) mod timestamps;
 mod transact;
 pub(crate) mod undo;
@@ -15,7 +16,7 @@ use crate::{
     log::{default_logger, Logger},
     notetype::{Notetype, NotetypeId},
     scheduler::{queue::CardQueues, SchedulerInfo},
-    storage::SqliteStorage,
+    storage::{SchemaVersion, SqliteStorage},
     types::Usn,
     undo::UndoManager,
 };
@@ -140,8 +141,8 @@ impl Collection {
         builder
     }
 
-    pub(crate) fn close(self, downgrade: bool) -> Result<()> {
-        self.storage.close(downgrade)
+    pub(crate) fn close(self, desired_version: Option<SchemaVersion>) -> Result<()> {
+        self.storage.close(desired_version)
     }
 
     pub(crate) fn usn(&self) -> Result<Usn> {

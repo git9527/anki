@@ -1,16 +1,19 @@
 // Copyright: Ankitects Pty Ltd and contributors
 // License: GNU AGPL, version 3 or later; http://www.gnu.org/licenses/agpl.html
 
+use std::{path::Path, sync::MutexGuard};
+
 use slog::error;
 
 use super::{progress::Progress, Backend};
 pub(super) use crate::backend_proto::collection_service::Service as CollectionService;
 use crate::{
     backend::progress::progress_to_proto,
-    backend_proto as pb,
-    collection::CollectionBuilder,
+    backend_proto::{self as pb, preferences::Backups},
+    collection::{backup, CollectionBuilder},
     log::{self},
     prelude::*,
+    storage::SchemaVersion,
 };
 
 impl CollectionService for Backend {
@@ -25,10 +28,7 @@ impl CollectionService for Backend {
     }
 
     fn open_collection(&self, input: pb::OpenCollectionRequest) -> Result<pb::Empty> {
-        let mut col = self.col.lock().unwrap();
-        if col.is_some() {
-            return Err(AnkiError::CollectionAlreadyOpen);
-        }
+        let mut guard = self.lock_closed_collection()?;
 
         let mut builder = CollectionBuilder::new(input.collection_path);
         builder
@@ -37,9 +37,11 @@ impl CollectionService for Backend {
             .set_tr(self.tr.clone());
         if !input.log_path.is_empty() {
             builder.set_log_file(&input.log_path)?;
+        } else {
+            builder.set_logger(self.log.clone());
         }
 
-        *col = Some(builder.build()?);
+        *guard = Some(builder.build()?);
 
         Ok(().into())
     }
@@ -47,17 +49,26 @@ impl CollectionService for Backend {
     fn close_collection(&self, input: pb::CloseCollectionRequest) -> Result<pb::Empty> {
         self.abort_media_sync_and_wait();
 
-        let mut col = self.col.lock().unwrap();
-        if col.is_none() {
-            return Err(AnkiError::CollectionNotOpen);
-        }
+        let mut guard = self.lock_open_collection()?;
 
-        let col_inner = col.take().unwrap();
+        let mut col_inner = guard.take().unwrap();
+        let limits = col_inner.get_backups();
+        let col_path = std::mem::take(&mut col_inner.col_path);
+
         if input.downgrade_to_schema11 {
             let log = log::terminal();
-            if let Err(e) = col_inner.close(input.downgrade_to_schema11) {
+            if let Err(e) = col_inner.close(Some(SchemaVersion::V11)) {
                 error!(log, " failed: {:?}", e);
             }
+        }
+
+        if let Some(backup_folder) = input.backup_folder {
+            self.start_backup(
+                col_path,
+                backup_folder,
+                limits,
+                input.minimum_backup_interval,
+            )?;
         }
 
         Ok(().into())
@@ -96,5 +107,54 @@ impl CollectionService for Backend {
         let starting_from = input.val as usize;
         self.with_col(|col| col.merge_undoable_ops(starting_from))
             .map(Into::into)
+    }
+
+    fn await_backup_completion(&self, _input: pb::Empty) -> Result<pb::Empty> {
+        self.await_backup_completion();
+        Ok(().into())
+    }
+}
+
+impl Backend {
+    pub(super) fn lock_open_collection(&self) -> Result<MutexGuard<Option<Collection>>> {
+        let guard = self.col.lock().unwrap();
+        guard
+            .is_some()
+            .then(|| guard)
+            .ok_or(AnkiError::CollectionNotOpen)
+    }
+
+    pub(super) fn lock_closed_collection(&self) -> Result<MutexGuard<Option<Collection>>> {
+        let guard = self.col.lock().unwrap();
+        guard
+            .is_none()
+            .then(|| guard)
+            .ok_or(AnkiError::CollectionAlreadyOpen)
+    }
+
+    fn await_backup_completion(&self) {
+        if let Some(task) = self.backup_task.lock().unwrap().take() {
+            task.join().unwrap();
+        }
+    }
+
+    fn start_backup(
+        &self,
+        col_path: impl AsRef<Path>,
+        backup_folder: impl AsRef<Path> + Send + 'static,
+        limits: Backups,
+        minimum_backup_interval: Option<u64>,
+    ) -> Result<()> {
+        self.await_backup_completion();
+        *self.backup_task.lock().unwrap() = backup::backup(
+            col_path,
+            backup_folder,
+            limits,
+            minimum_backup_interval,
+            self.log.clone(),
+            self.tr.clone(),
+        )?;
+
+        Ok(())
     }
 }
