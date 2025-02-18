@@ -1,0 +1,52 @@
+name: Build and Install Anki Sync Server from Specific Commit
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit-hash:
+        description: 'Commit hash to build'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository at specific commit
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event.inputs.commit-hash }}  # Uses the input commit hash
+
+    - name: Set up Rust
+      uses: actions/setup-rust@v1
+      with:
+        rust-version: 1.70 # or whatever version you're working with
+
+    - name: Set up Ninja Build
+      run: |
+        sudo apt-get update
+        sudo apt-get install ninja-build
+
+    - name: Build project with ninja
+      run: ./ninja extract:protoc
+
+    - name: Install Rust dependencies
+      run: cargo install --path rslib/sync
+    
+    - name: Verify installation
+      run: cargo --version
+
+    - name: Package the build output
+      run: |
+        # Assuming the output is in a specific directory, e.g., 'target/release/'
+        mkdir -p output
+        cp target/release/sync-server output/ # Adjust this to match the actual build output location
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: anki-sync-server
+        path: output/
+
+
