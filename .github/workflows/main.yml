@@ -14,14 +14,9 @@ jobs:
 
     steps:
     - name: Checkout repository at specific commit
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         ref: ${{ github.event.inputs.commit-hash }}  # Uses the input commit hash
-
-    - name: Set up Rust
-      uses: actions/setup-rust@v1
-      with:
-        rust-version: 1.70 # or whatever version you're working with
 
     - name: Set up Ninja Build
       run: |
@@ -44,7 +39,7 @@ jobs:
         cp target/release/sync-server output/ # Adjust this to match the actual build output location
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: anki-sync-server
         path: output/
