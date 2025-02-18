@@ -18,16 +18,8 @@ jobs:
       with:
         ref: ${{ github.event.inputs.commit-hash }}  # Uses the input commit hash
 
-    - name: Set up Ninja Build
-      run: |
-        sudo apt-get update
-        sudo apt-get install ninja-build
-
-    - name: Build project with ninja
-      run: ./ninja extract:protoc
-
     - name: Install Rust dependencies
-      run: cargo install --path rslib/sync
+      run: cargo install --root /tmp/anki-server anki-sync-server
     
     - name: Verify installation
       run: cargo --version
@@ -36,7 +28,7 @@ jobs:
       run: |
         # Assuming the output is in a specific directory, e.g., 'target/release/'
         mkdir -p output
-        cp target/release/sync-server output/ # Adjust this to match the actual build output location
+        cp /tmp/anki-server/bin/anki-sync-server output/ # Adjust this to match the actual build output location
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
