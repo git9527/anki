@@ -19,7 +19,9 @@ jobs:
         ref: ${{ github.event.inputs.commit-hash }}  # Uses the input commit hash
 
     - name: Install Rust dependencies
-      run: cargo install --path rslib/sync
+      run: |
+          ./ninja extract:protoc
+          cargo install --path rslib/sync
     
     - name: Verify installation
       run: cargo --version
